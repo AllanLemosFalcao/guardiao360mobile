@@ -13,6 +13,7 @@ export const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
+    elevation: 2,
   },
   backButton: {
     padding: 8,
@@ -25,7 +26,7 @@ export const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 100,
   },
 
   // --- Cartões de Seção ---
@@ -38,11 +39,12 @@ export const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOpacity: 0.1,
     shadowRadius: 3,
+    zIndex: 1, // Base zIndex
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1976D2', // Azul padrão sistema
+    color: '#1976D2',
     marginBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
@@ -51,7 +53,7 @@ export const styles = StyleSheet.create({
 
   // --- Inputs ---
   inputGroup: {
-    marginBottom: 12,
+    marginBottom: 15,
   },
   label: {
     fontSize: 13,
@@ -61,61 +63,68 @@ export const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#ccc',
     borderRadius: 8,
     padding: 12,
-    fontSize: 15,
+    fontSize: 16,
     color: '#333',
     backgroundColor: '#FAFAFA',
   },
-  textArea: {
-    height: 120,
-    textAlignVertical: 'top', // Para o texto começar em cima no Android
-  },
 
-  // --- Linha de Contadores (Vítimas) ---
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  counterContainer: {
-    width: '30%',
-    alignItems: 'center',
-  },
-  counterInput: {
-    width: '100%',
-    textAlign: 'center',
+  // --- Autocomplete (Sugestões) ---
+  suggestionsBox: {
+    position: 'absolute',
+    top: 75,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 16,
-    fontWeight: 'bold',
+    borderRadius: 4,
+    zIndex: 9999, // Muito alto para cobrir tudo
+    elevation: 5,
+    maxHeight: 200,
+  },
+  suggestionItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  suggestionText: {
+    fontSize: 14,
+    color: '#333',
   },
 
-  // --- Checkboxes (Formulários Específicos) ---
-  checkboxContainer: {
+  // --- Botões de Opção (Radio / Chips) ---
+  radioContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    padding: 8,
+    flexWrap: 'wrap',
+  },
+  radioButton: {
     borderWidth: 1,
-    borderColor: '#eee',
-    borderRadius: 8,
-  },
-  checkboxActive: {
-    backgroundColor: '#E3F2FD',
     borderColor: '#1976D2',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginRight: 8,
+    marginBottom: 8,
+    backgroundColor: '#fff',
   },
-  checkboxLabel: {
-    fontSize: 14,
-    marginLeft: 10,
-    color: '#333',
+  radioButtonSelected: {
+    backgroundColor: '#1976D2',
+  },
+  radioText: {
+    color: '#1976D2',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  radioTextSelected: {
+    color: '#fff',
   },
 
   // --- Botão Final ---
   submitButton: {
-    backgroundColor: '#388E3C', // Verde para finalizar
+    backgroundColor: '#388E3C', // Verde
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
