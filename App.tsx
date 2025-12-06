@@ -14,6 +14,9 @@ import OcorrenciasScreen from './src/screens/OcorrenciasScreen';
 import NotificacoesScreen from './src/screens/NotificacoesScreen';
 import ConfiguracoesScreen from './src/screens/ConfiguracoesScreen';
 import MapaScreen from './src/screens/MapaScreen';
+import DetalhesOcorrenciaScreen from './src/screens/DetalhesOcorrenciaScreen';
+import ChegadaCenaScreen from './src/screens/ChegadaCenaScreen';
+import RelatorioFinalScreen from './src/screens/RelatorioFinalScreen';
 
 // --- TIPAGEM ---
 export type RootStackParamList = {
@@ -21,6 +24,13 @@ export type RootStackParamList = {
   MainTabs: undefined; // O grupo de abas
   NovaOcorrencia: undefined; // Modal (fora das abas)
   Ocorrencias: undefined; // Lista (acessada pela Home)
+  // Rota nova para a tela de detalhes inteligente:
+  DetalhesOcorrencia: { 
+    idOcorrencia: string; 
+    dadosIniciais: any; 
+    ChegadaCena: { idOcorrencia: string }; // etapa 2 formulario
+    RelatorioFinal: { idOcorrencia: string };
+  };
 };
 
 // Stack Principal (Navegação vertical/modais)
@@ -70,7 +80,7 @@ function AppTabs() {
           tabBarIcon: ({ color, size }) => (
             <Feather name="bell" size={size} color={color} />
           ),
-          tabBarBadge: 3, // Exemplo de bolinha vermelha com número
+          tabBarBadge: 3, 
         }}
       />
 
@@ -142,9 +152,32 @@ export default function App() {
           component={NovaOcorrenciaScreen} 
           options={{ presentation: 'modal' }}
         />
+        <Stack.Screen 
+          name="RelatorioFinal" 
+          component={RelatorioFinalScreen}
+          options={{ headerShown: false }} 
+        />
         
-        {/* Tela de Lista de Ocorrências (Mantive fora das abas para ter tela cheia se quiser) */}
+        
+        {/* Tela de Lista de Ocorrências (Histórico) */}
         <Stack.Screen name="Ocorrencias" component={OcorrenciasScreen} />
+
+        {/* NOVA TELA DE DETALHES INTELIGENTE */}
+        <Stack.Screen 
+          name="DetalhesOcorrencia" 
+          component={DetalhesOcorrenciaScreen}
+          options={{ 
+            headerShown: true, // Mostra o header padrão se quiser, ou false se usar o customizado da tela
+            title: 'Atendimento em Andamento',
+            headerBackVisible: false // Impede voltar acidentalmente
+          }} 
+        />
+
+        <Stack.Screen 
+          name="ChegadaCena" 
+          component={ChegadaCenaScreen}
+          options={{ headerShown: false }} 
+        />
 
       </Stack.Navigator>
     </NavigationContainer>

@@ -1,124 +1,140 @@
 import { StyleSheet } from 'react-native';
 
 export const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#F9F9F9' 
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
   },
-  header: { 
-    padding: 20, 
-    backgroundColor: '#fff', 
-    borderBottomWidth: 1, 
-    borderColor: '#eee' 
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    backgroundColor: '#fff',
+    elevation: 2,
   },
-  headerTitle: { 
-    fontSize: 22, 
-    fontWeight: 'bold', 
-    color: '#B71C1C' 
-  },
-  content: { 
-    padding: 20, 
-    paddingBottom: 100 
-  },
-  sectionTitle: { 
-    fontSize: 18, 
-    fontWeight: 'bold', 
-    marginBottom: 20, 
-    color: '#333' 
-  },
-  label: { 
-    fontSize: 14, 
-    color: '#444', 
-    fontWeight: '600', 
-    marginBottom: 6, 
-    marginTop: 10 
-  },
-  input: { 
-    backgroundColor: '#fff', 
-    borderWidth: 1, 
-    borderColor: '#DDD', 
-    borderRadius: 8, 
-    padding: 12 
-  },
-  inputSelect: { 
-    backgroundColor: '#fff', 
-    borderWidth: 1, 
-    borderColor: '#DDD', 
-    borderRadius: 8, 
-    padding: 15 
-  },
-  row: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between' 
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
   },
   
-  // Assinatura
-  signatureBox: { 
-    height: 250, 
-    borderWidth: 1, 
-    borderColor: '#CCC', 
-    backgroundColor: '#FFF', 
-    marginTop: 10 
+  content: {
+    padding: 20,
+    paddingBottom: 100,
   },
-  signatureButtons: { 
-    flexDirection: 'row', 
-    justifyContent: 'flex-end', 
-    marginTop: 10, 
-    gap: 10 
-  },
-  smallBtn: { 
-    padding: 10, 
-    borderWidth: 1, 
-    borderColor: '#CCC', 
-    borderRadius: 6 
-  },
-  smallBtnConfirm: { 
-    padding: 10, 
-    backgroundColor: '#B71C1C', 
-    borderRadius: 6 
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1976D2',
+    marginTop: 10,
+    marginBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    paddingBottom: 5,
   },
 
-  // Modal
-  modalHeader: { 
-    flexDirection: 'row', 
-    padding: 15, 
-    alignItems: 'center', 
-    borderBottomWidth: 1 
+  // --- Inputs ---
+  inputGroup: {
+    marginBottom: 15,
+    zIndex: 1, // Importante para o dropdown passar por cima
   },
-  searchInput: { 
-    flex: 1, 
-    backgroundColor: '#F5F5F5', 
-    padding: 10, 
-    borderRadius: 8, 
-    marginRight: 10 
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  itemLista: { 
-    padding: 15, 
-    borderBottomWidth: 1, 
-    borderColor: '#EEE' 
+  halfInput: {
+    width: '48%',
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#555',
+    marginBottom: 6,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#333',
+    backgroundColor: '#FAFAFA',
+  },
+  
+  // --- Lista de Sugestões (Autocomplete) ---
+  suggestionsBox: {
+    position: 'absolute',
+    top: 75, // Ajustar conforme altura do input + label
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    zIndex: 1000,
+    elevation: 5,
+    maxHeight: 150,
+  },
+  suggestionItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  suggestionText: {
+    fontSize: 14,
+    color: '#333',
   },
 
-  // Rodapé
-  footer: { 
-    position: 'absolute', 
-    bottom: 0, 
-    left: 0, 
-    right: 0, 
-    padding: 20, 
-    backgroundColor: '#FFF', 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    borderTopWidth: 1, 
-    borderColor: '#EEE' 
+  // --- Botões de Opção (Radio) ---
+  radioContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 5,
   },
-  btnPrimary: { 
-    backgroundColor: '#B71C1C', 
-    paddingVertical: 14, 
-    paddingHorizontal: 30, 
-    borderRadius: 8 
+  radioButton: {
+    borderWidth: 1,
+    borderColor: '#1976D2',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginRight: 8,
+    marginBottom: 8,
   },
-  btnSecondary: { 
-    paddingVertical: 14, 
-    paddingHorizontal: 20 
+  radioButtonSelected: {
+    backgroundColor: '#1976D2',
+  },
+  radioText: {
+    color: '#1976D2',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  radioTextSelected: {
+    color: '#fff',
+  },
+
+  // --- Botão de Ação ---
+  footer: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    backgroundColor: '#fff',
+  },
+  button: {
+    backgroundColor: '#B71C1C',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    elevation: 2,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 10,
   },
 });

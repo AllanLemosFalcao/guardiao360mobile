@@ -1,198 +1,259 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { 
-  View, Text, TextInput, TouchableOpacity, ScrollView, Alert, SafeAreaView, FlatList, Modal, Platform 
-} from 'react-native'; // Removido StyleSheet daqui
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  SafeAreaView, 
+  ScrollView,
+  Alert
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { naturezasCBMPE } from '../data/naturezas'; 
-
-// IMPORTAÇÃO DOS ESTILOS SEPARADOS
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { RootStackParamList } from '../../App';
 import { styles } from './NovaOcorrenciaScreen.styles';
 
-// --- Carregamento Condicional da Assinatura ---
-let SignatureScreen: any = null;
-if (Platform.OS !== 'web') {
-  try {
-    SignatureScreen = require('react-native-signature-canvas').default;
-  } catch (err) {
-    console.warn("Erro ao carregar biblioteca de assinatura:", err);
-  }
-}
+type NovaOcorrenciaProp = NativeStackNavigationProp<RootStackParamList, 'NovaOcorrencia'>;
 
-type OcorrenciaFormData = {
-  pontoBase: string; ome: string; viatura: string; numeroAviso: string;
-  dataRecebimento: string; horaRecebimento: string; formaAcionamento: string;
-  situacao: string; endereco: string; municipio: string; bairro: string; latitude: string; longitude: string;
-  natureza: string; codigoNatureza: string; descricaoInicial: string;
-  assinaturaBase64: string | null;
-};
+// --- LISTAS DE OPÇÕES ---
+const LISTA_VIATURAS = [
+  'ABSL', 'ABSM', 'ABT', 'ACO', 'AP', 'AR', 'ASV', 'AT / 1', 'ATP/1', 'BIS', 'EQUIPE DE GUARDA VIDAS', 'MR', 'MSA', 'OUTRO'
+];
 
-export default function NovaOcorrenciaScreen() {
-  const navigation = useNavigation<any>();
-  const [step, setStep] = useState(1);
-  const [showNaturezaList, setShowNaturezaList] = useState(false);
-  const [filtroNatureza, setFiltroNatureza] = useState('');
-  const signatureRef = useRef<any>(null);
+const LISTA_GRUPAMENTOS = [
+  'GBI', 'GBAPH', 'GBS', 'GBMAR'
+];
 
-  const [formData, setFormData] = useState<OcorrenciaFormData>({
-    pontoBase: '', ome: '', viatura: '', numeroAviso: '',
-    dataRecebimento: new Date().toLocaleDateString('pt-BR'),
-    horaRecebimento: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit'}),
-    formaAcionamento: '193', situacao: 'Despachada', 
-    endereco: '', municipio: 'Recife', bairro: '', latitude: '', longitude: '',
-    natureza: '', codigoNatureza: '', descricaoInicial: '', assinaturaBase64: null
-  });
+const LISTA_PONTOS_BASE = [
+  'Ceasa', 'CMan - 2ª SBMAR', 'GBI - 1ª SBI', 'GBS - 1ª SBS', 'IGARASSU - 2ª SBAPH', 
+  'QCG - 2ª SBI', 'São Lourenço da Mata - 3ª SBAPH', 'SBFN', 'SUAPE - 3ª SBI', 'Outro'
+];
 
-  const updateField = (field: keyof OcorrenciaFormData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+const LISTA_FORMA_ACIONAMENTO = [
+  'CIODS', 'CO DO GRUPAMENTO', 'PESSOALMENTE', 'OUTRO'
+];
 
-  const selecionarNatureza = (item: typeof naturezasCBMPE[0]) => {
-    updateField('natureza', item.descricao);
-    updateField('codigoNatureza', item.codigo);
-    setShowNaturezaList(false);
-    setFiltroNatureza('');
-  };
+const LISTA_LOCAL_ACIONAMENTO = [
+  'Ponto zero', 'Retornando ao ponto zero', 'Imediatamente após finalizar a ocorrência anterior', 'Outro'
+];
 
-  const handleSignatureOK = (signature: string) => {
-    updateField('assinaturaBase64', signature);
-    Alert.alert("Sucesso", "Assinatura capturada!");
-  };
-
-  const handleNext = () => {
-    if (step < 4) setStep(step + 1);
-    else handleSubmit();
-  };
-
-  const handleBack = () => {
-    if (step > 1) setStep(step - 1);
-    else navigation.goBack();
-  };
-
-  const handleSubmit = () => {
-    if (!formData.assinaturaBase64 && SignatureScreen) {
-      Alert.alert("Atenção", "A assinatura é obrigatória.");
-      return;
-    }
-    console.log("DADOS FINAIS:", formData);
-    Alert.alert("Sucesso", "Ocorrência salva!");
-    navigation.navigate('Home');
-  };
-
-  const listaFiltrada = naturezasCBMPE.filter(item => 
-    item.descricao.toLowerCase().includes(filtroNatureza.toLowerCase()) || item.codigo.includes(filtroNatureza)
-  );
-
-  const renderStep1 = () => (
-    <View>
-      <Text style={styles.sectionTitle}>1. Dados do Acionamento</Text>
-      <View style={styles.row}>
-        <View style={{ flex: 1, marginRight: 10 }}>
-          <Text style={styles.label}>Ponto Base / OME</Text>
-          <TextInput style={styles.input} placeholder="Ex: GBI" value={formData.pontoBase} onChangeText={t => updateField('pontoBase', t)} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.label}>Nº Aviso</Text>
-          <TextInput style={styles.input} placeholder="000123" keyboardType="numeric" value={formData.numeroAviso} onChangeText={t => updateField('numeroAviso', t)} />
-        </View>
-      </View>
-      <Text style={styles.label}>Viatura Responsável</Text>
-      <TextInput style={styles.input} placeholder="Ex: ABT-34" value={formData.viatura} onChangeText={t => updateField('viatura', t)} />
-    </View>
-  );
-
-  const renderStep2 = () => (
-    <View>
-      <Text style={styles.sectionTitle}>2. Localização</Text>
-      <Text style={styles.label}>Endereço Completo</Text>
-      <TextInput style={styles.input} placeholder="Rua, Número..." value={formData.endereco} onChangeText={t => updateField('endereco', t)} />
-      <View style={styles.row}>
-        <View style={{ flex: 1, marginRight: 10 }}>
-          <Text style={styles.label}>Bairro</Text>
-          <TextInput style={styles.input} value={formData.bairro} onChangeText={t => updateField('bairro', t)} />
-        </View>
-      </View>
-    </View>
-  );
-
-  const renderStep3 = () => (
-    <View>
-      <Text style={styles.sectionTitle}>3. Classificação</Text>
-      <Text style={styles.label}>Natureza</Text>
-      <TouchableOpacity style={styles.inputSelect} onPress={() => setShowNaturezaList(true)}>
-        <Text style={{ color: formData.natureza ? '#000' : '#999' }}>{formData.natureza || 'Toque para pesquisar...'}</Text>
-      </TouchableOpacity>
-      
-      <Modal visible={showNaturezaList} animationType="slide">
-        <SafeAreaView style={{flex: 1}}>
-          <View style={styles.modalHeader}>
-            <TextInput style={styles.searchInput} placeholder="Buscar..." value={filtroNatureza} onChangeText={setFiltroNatureza} autoFocus />
-            <TouchableOpacity onPress={() => setShowNaturezaList(false)}><Text style={{color: 'red'}}>Fechar</Text></TouchableOpacity>
-          </View>
-          <FlatList 
-            data={listaFiltrada} 
-            keyExtractor={item => item.codigo} 
-            renderItem={({item}) => (
-              <TouchableOpacity style={styles.itemLista} onPress={() => selecionarNatureza(item)}>
-                <Text style={{fontWeight: 'bold'}}>{item.tipo}</Text>
-                <Text>{item.descricao}</Text>
-              </TouchableOpacity>
-            )} 
-          />
-        </SafeAreaView>
-      </Modal>
-    </View>
-  );
-
-  const renderStep4 = () => (
-    <View style={{flex: 1}}>
-      <Text style={styles.sectionTitle}>4. Assinatura</Text>
-      
-      <View style={styles.signatureBox}>
-        {SignatureScreen ? (
-          <SignatureScreen
-            ref={signatureRef}
-            onOK={handleSignatureOK}
-            webStyle={`.m-signature-pad--footer {display: none; margin: 0px;}`} 
-          />
-        ) : (
-          <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-            <Text style={{textAlign: 'center', color: '#666'}}>
-              {Platform.OS === 'web' ? 'Assinatura não suportada no Navegador (Web).' : 'Biblioteca de assinatura não carregada.'}
-            </Text>
-            
-            <TouchableOpacity 
-                style={{marginTop: 20, padding: 10, backgroundColor: '#eee', borderRadius: 5}}
-                onPress={() => updateField('assinaturaBase64', 'assinatura_fake_web')}
-            >
-                <Text>Simular Assinatura (Teste Web)</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-      
-      {SignatureScreen && (
-        <View style={styles.signatureButtons}>
-            <TouchableOpacity style={styles.smallBtn} onPress={() => signatureRef.current?.clearSignature()}><Text>Limpar</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.smallBtnConfirm} onPress={() => signatureRef.current?.readSignature()}><Text style={{color: '#fff'}}>Confirmar</Text></TouchableOpacity>
-        </View>
-      )}
-
-      {formData.assinaturaBase64 && <Text style={{color: 'green', textAlign: 'center', marginTop: 10}}>✅ Assinada</Text>}
-    </View>
+// --- COMPONENTE 1: INPUT COM SUGESTÃO (Atualizado) ---
+const InputComSugestao = ({ label, value, setValue, listaOpcoes, placeholder }: any) => {
+  const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
+  
+  // Filtra a lista. Se vazio, mostra tudo.
+  const sugestoesFiltradas = listaOpcoes.filter((item: string) => 
+    item.toUpperCase().includes(value.toUpperCase())
   );
 
   return (
+    <View style={[styles.inputGroup, { zIndex: mostrarSugestoes ? 10 : 1 }]}>
+      <Text style={styles.label}>{label}</Text>
+      <TextInput 
+        style={styles.input}
+        value={value}
+        onChangeText={(text) => {
+          setValue(text);
+          setMostrarSugestoes(true);
+        }}
+        // Ao clicar (Foco), mostra a lista imediatamente
+        onFocus={() => setMostrarSugestoes(true)}
+        
+        // Delay para permitir o clique na opção
+        onBlur={() => setTimeout(() => setMostrarSugestoes(false), 200)}
+        placeholder={placeholder}
+      />
+      
+      {/* CORREÇÃO AQUI: Removemos "value.length > 0" */}
+      {mostrarSugestoes && sugestoesFiltradas.length > 0 && (
+        <View style={styles.suggestionsBox}>
+          {/* Mostra até 50 opções para cobrir listas longas ao abrir vazio */}
+          {sugestoesFiltradas.slice(0, 50).map((item: string, index: number) => (
+            <TouchableOpacity 
+              key={index} 
+              style={styles.suggestionItem}
+              onPress={() => {
+                setValue(item);
+                setMostrarSugestoes(false);
+              }}
+            >
+              <Text style={styles.suggestionText}>{item}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+};
+
+// --- COMPONENTE 2: SELETOR DE CHIPS ---
+const SeletorChips = ({ label, opcoes, selecionado, setSelecionado }: any) => (
+  <View style={styles.inputGroup}>
+    <Text style={styles.label}>{label}</Text>
+    <View style={styles.radioContainer}>
+      {opcoes.map((op: string) => (
+        <TouchableOpacity
+          key={op}
+          style={[styles.radioButton, selecionado === op && styles.radioButtonSelected]}
+          onPress={() => setSelecionado(op)}
+        >
+          <Text style={[styles.radioText, selecionado === op && styles.radioTextSelected]}>
+            {op}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  </View>
+);
+
+// --- TELA PRINCIPAL ---
+export default function NovaOcorrenciaScreen() {
+  const navigation = useNavigation<NovaOcorrenciaProp>();
+
+  // --- ESTADOS DOS CAMPOS ---
+  const [tipoViatura, setTipoViatura] = useState('');
+  const [numeroViatura, setNumeroViatura] = useState('');
+  const [codLocal, setCodLocal] = useState('');
+  const [grupamento, setGrupamento] = useState('');
+  const [pontoBase, setPontoBase] = useState('');
+  
+  // Data e Hora
+  const [dataAcionamento, setDataAcionamento] = useState(new Date().toLocaleDateString('pt-BR'));
+  const [horaAcionamento, setHoraAcionamento] = useState(new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'}));
+  
+  const [formaAcionamento, setFormaAcionamento] = useState('');
+  const [localAcionamento, setLocalAcionamento] = useState('');
+
+  // --- FUNÇÃO DE INICIAR ---
+  const iniciarDeslocamento = () => {
+    if (!tipoViatura || !numeroViatura || !grupamento) {
+      Alert.alert("Campos Obrigatórios", "Preencha a Viatura, Número e Grupamento.");
+      return;
+    }
+
+    const novoId = `B-2025-${Math.floor(Math.random() * 10000)}`;
+
+    navigation.navigate('DetalhesOcorrencia', {
+      idOcorrencia: novoId,
+      dadosIniciais: {
+        viatura: `${tipoViatura}-${numeroViatura}`,
+        grupamento,
+        pontoBase,
+        codLocal,
+        horaDespacho: `${dataAcionamento} ${horaAcionamento}`,
+        status: 'Em Deslocamento',
+        formaAcionamento,
+        localAcionamento
+      }
+    });
+  };
+
+  return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}><Text style={styles.headerTitle}>Novo Registro</Text></View>
-      <ScrollView contentContainerStyle={styles.content}>
-        {step === 1 && renderStep1()}
-        {step === 2 && renderStep2()}
-        {step === 3 && renderStep3()}
-        {step === 4 && renderStep4()}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Nova Ocorrência</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Feather name="x" size={24} color="#666" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        
+        <Text style={styles.sectionTitle}>Dados da Viatura</Text>
+        
+        {/* Linha 1: Tipo e Número */}
+        <View style={[styles.row, {zIndex: 20}]}>
+          <View style={styles.halfInput}>
+            <InputComSugestao 
+              label="Viatura Empregada"
+              value={tipoViatura}
+              setValue={setTipoViatura}
+              listaOpcoes={LISTA_VIATURAS}
+              placeholder="Ex: ABT"
+            />
+          </View>
+          <View style={styles.halfInput}>
+            <Text style={styles.label}>Número</Text>
+            <TextInput 
+              style={styles.input} 
+              value={numeroViatura} 
+              onChangeText={setNumeroViatura}
+              keyboardType="numeric"
+              placeholder="Ex: 12"
+            />
+          </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>Localização e Origem</Text>
+
+        {/* Grupamento */}
+        <InputComSugestao 
+          label="Grupamento (OME)"
+          value={grupamento}
+          setValue={setGrupamento}
+          listaOpcoes={LISTA_GRUPAMENTOS}
+          placeholder="Ex: GBI"
+        />
+
+        {/* Ponto Base */}
+        <InputComSugestao 
+          label="Ponto Base"
+          value={pontoBase}
+          setValue={setPontoBase}
+          listaOpcoes={LISTA_PONTOS_BASE}
+          placeholder="Selecione o local de saída"
+        />
+
+        {/* Código Local */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Código do Local da Ocorrência</Text>
+          <TextInput 
+            style={styles.input} 
+            value={codLocal} 
+            onChangeText={setCodLocal}
+            placeholder="Ex: 1234"
+            keyboardType="numeric"
+          />
+        </View>
+
+        <Text style={styles.sectionTitle}>Dados do Acionamento</Text>
+
+        {/* Data e Hora */}
+        <View style={styles.row}>
+          <View style={styles.halfInput}>
+            <Text style={styles.label}>Data</Text>
+            <TextInput style={styles.input} value={dataAcionamento} onChangeText={setDataAcionamento} />
+          </View>
+          <View style={styles.halfInput}>
+            <Text style={styles.label}>Hora</Text>
+            <TextInput style={styles.input} value={horaAcionamento} onChangeText={setHoraAcionamento} />
+          </View>
+        </View>
+
+        {/* Forma de Acionamento (Chips) */}
+        <SeletorChips 
+          label="Forma do Acionamento" 
+          opcoes={LISTA_FORMA_ACIONAMENTO} 
+          selecionado={formaAcionamento}
+          setSelecionado={setFormaAcionamento}
+        />
+
+        {/* Local do Acionamento (Chips) */}
+        <SeletorChips 
+          label="Local da VTR no Acionamento" 
+          opcoes={LISTA_LOCAL_ACIONAMENTO} 
+          selecionado={localAcionamento}
+          setSelecionado={setLocalAcionamento}
+        />
+
       </ScrollView>
+
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.btnSecondary} onPress={handleBack}><Text>Voltar</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.btnPrimary} onPress={handleNext}><Text style={{color: '#fff'}}>Continuar</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.button} onPress={iniciarDeslocamento}>
+          <MaterialCommunityIcons name="car-emergency" size={24} color="#fff" />
+          <Text style={styles.buttonText}>INICIAR DESLOCAMENTO</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
