@@ -11,8 +11,12 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Crypto from 'expo-crypto'; // Se der erro, use Date.now().toString()
 import { RootStackParamList } from '../../App';
 import { styles } from './NovaOcorrenciaScreen.styles';
+
+// Importa a função de banco de dados
+import { executeSql } from '../services/db';
 
 type NovaOcorrenciaProp = NativeStackNavigationProp<RootStackParamList, 'NovaOcorrencia'>;
 
@@ -21,28 +25,23 @@ const LISTA_VIATURAS = [
   'ABSL', 'ABSM', 'ABT', 'ACO', 'AP', 'AR', 'ASV', 'AT / 1', 'ATP/1', 'BIS', 'EQUIPE DE GUARDA VIDAS', 'MR', 'MSA', 'OUTRO'
 ];
 
-const LISTA_GRUPAMENTOS = [
-  'GBI', 'GBAPH', 'GBS', 'GBMAR'
-];
+const LISTA_GRUPAMENTOS = ['GBI', 'GBAPH', 'GBS', 'GBMAR'];
 
 const LISTA_PONTOS_BASE = [
   'Ceasa', 'CMan - 2ª SBMAR', 'GBI - 1ª SBI', 'GBS - 1ª SBS', 'IGARASSU - 2ª SBAPH', 
   'QCG - 2ª SBI', 'São Lourenço da Mata - 3ª SBAPH', 'SBFN', 'SUAPE - 3ª SBI', 'Outro'
 ];
 
-const LISTA_FORMA_ACIONAMENTO = [
-  'CIODS', 'CO DO GRUPAMENTO', 'PESSOALMENTE', 'OUTRO'
-];
+const LISTA_FORMA_ACIONAMENTO = ['CIODS', 'CO DO GRUPAMENTO', 'PESSOALMENTE', 'OUTRO'];
 
 const LISTA_LOCAL_ACIONAMENTO = [
   'Ponto zero', 'Retornando ao ponto zero', 'Imediatamente após finalizar a ocorrência anterior', 'Outro'
 ];
 
-// --- COMPONENTE 1: INPUT COM SUGESTÃO (Atualizado) ---
+// --- COMPONENTE 1: INPUT COM SUGESTÃO ---
 const InputComSugestao = ({ label, value, setValue, listaOpcoes, placeholder }: any) => {
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
   
-  // Filtra a lista. Se vazio, mostra tudo.
   const sugestoesFiltradas = listaOpcoes.filter((item: string) => 
     item.toUpperCase().includes(value.toUpperCase())
   );
@@ -57,18 +56,13 @@ const InputComSugestao = ({ label, value, setValue, listaOpcoes, placeholder }: 
           setValue(text);
           setMostrarSugestoes(true);
         }}
-        // Ao clicar (Foco), mostra a lista imediatamente
         onFocus={() => setMostrarSugestoes(true)}
-        
-        // Delay para permitir o clique na opção
         onBlur={() => setTimeout(() => setMostrarSugestoes(false), 200)}
         placeholder={placeholder}
       />
       
-      {/* CORREÇÃO AQUI: Removemos "value.length > 0" */}
       {mostrarSugestoes && sugestoesFiltradas.length > 0 && (
         <View style={styles.suggestionsBox}>
-          {/* Mostra até 50 opções para cobrir listas longas ao abrir vazio */}
           {sugestoesFiltradas.slice(0, 50).map((item: string, index: number) => (
             <TouchableOpacity 
               key={index} 
@@ -124,29 +118,82 @@ export default function NovaOcorrenciaScreen() {
   
   const [formaAcionamento, setFormaAcionamento] = useState('');
   const [localAcionamento, setLocalAcionamento] = useState('');
+  const [salvando, setSalvando] = useState(false); // Estado de loading para o botão
 
-  // --- FUNÇÃO DE INICIAR ---
-  const iniciarDeslocamento = () => {
+  // --- FUNÇÃO DE INICIAR (Agora Salva no SQLite) ---
+  const iniciarDeslocamento = async () => {
+    // 1. Validação
     if (!tipoViatura || !numeroViatura || !grupamento) {
       Alert.alert("Campos Obrigatórios", "Preencha a Viatura, Número e Grupamento.");
       return;
     }
 
-    const novoId = `B-2025-${Math.floor(Math.random() * 10000)}`;
+    setSalvando(true);
 
-    navigation.navigate('DetalhesOcorrencia', {
-      idOcorrencia: novoId,
-      dadosIniciais: {
-        viatura: `${tipoViatura}-${numeroViatura}`,
-        grupamento,
-        pontoBase,
-        codLocal,
-        horaDespacho: `${dataAcionamento} ${horaAcionamento}`,
-        status: 'Em Deslocamento',
-        formaAcionamento,
-        localAcionamento
+    // 2. Preparar Dados
+    const numeroOcorrencia = `B-2025-${Math.floor(Math.random() * 10000)}`; // Simulação de numeração visual
+    const uuidLocal = Crypto.randomUUID(); // Identificador único para sync
+
+    try {
+      // 3. Executar INSERT no SQLite Local
+      const result = await executeSql(
+        `INSERT INTO ocorrencias (
+          uuid_local,
+          numero_ocorrencia,
+          tipo_viatura, 
+          numero_viatura, 
+          grupamento,
+          ponto_base, 
+          cod_local_ocorrencia, 
+          data_acionamento, 
+          hora_acionamento, 
+          forma_acionamento, 
+          local_vtr_acionamento,
+          status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        [
+          uuidLocal,
+          numeroOcorrencia,
+          tipoViatura,
+          numeroViatura,
+          grupamento,
+          pontoBase,
+          codLocal,
+          dataAcionamento,
+          horaAcionamento,
+          formaAcionamento,
+          localAcionamento,
+          'EM_DESLOCAMENTO'
+        ]
+      );
+
+      // 4. Verificar Sucesso
+      if (result.rowsAffected > 0) {
+        console.log(`Ocorrência Criada! ID Local: ${result.insertId}`);
+        
+        // 5. Navegar passando o ID REAL do Banco
+        navigation.navigate('DetalhesOcorrencia', {
+          idOcorrencia: numeroOcorrencia, // Apenas para mostrar no título
+          // Importante: passamos o dbId para a próxima tela saber qual linha atualizar
+          dbId: result.insertId, 
+          
+          dadosIniciais: {
+            viatura: `${tipoViatura}-${numeroViatura}`,
+            grupamento,
+            horaDespacho: `${dataAcionamento} ${horaAcionamento}`,
+            status: 'Em Deslocamento'
+          }
+        });
+      } else {
+        Alert.alert("Erro", "Não foi possível criar o registro no banco local.");
       }
-    });
+
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Erro Crítico", "Falha ao salvar dados offline.");
+    } finally {
+      setSalvando(false);
+    }
   };
 
   return (
@@ -162,7 +209,6 @@ export default function NovaOcorrenciaScreen() {
         
         <Text style={styles.sectionTitle}>Dados da Viatura</Text>
         
-        {/* Linha 1: Tipo e Número */}
         <View style={[styles.row, {zIndex: 20}]}>
           <View style={styles.halfInput}>
             <InputComSugestao 
@@ -187,7 +233,6 @@ export default function NovaOcorrenciaScreen() {
 
         <Text style={styles.sectionTitle}>Localização e Origem</Text>
 
-        {/* Grupamento */}
         <InputComSugestao 
           label="Grupamento (OME)"
           value={grupamento}
@@ -196,7 +241,6 @@ export default function NovaOcorrenciaScreen() {
           placeholder="Ex: GBI"
         />
 
-        {/* Ponto Base */}
         <InputComSugestao 
           label="Ponto Base"
           value={pontoBase}
@@ -205,7 +249,6 @@ export default function NovaOcorrenciaScreen() {
           placeholder="Selecione o local de saída"
         />
 
-        {/* Código Local */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Código do Local da Ocorrência</Text>
           <TextInput 
@@ -219,7 +262,6 @@ export default function NovaOcorrenciaScreen() {
 
         <Text style={styles.sectionTitle}>Dados do Acionamento</Text>
 
-        {/* Data e Hora */}
         <View style={styles.row}>
           <View style={styles.halfInput}>
             <Text style={styles.label}>Data</Text>
@@ -231,7 +273,6 @@ export default function NovaOcorrenciaScreen() {
           </View>
         </View>
 
-        {/* Forma de Acionamento (Chips) */}
         <SeletorChips 
           label="Forma do Acionamento" 
           opcoes={LISTA_FORMA_ACIONAMENTO} 
@@ -239,7 +280,6 @@ export default function NovaOcorrenciaScreen() {
           setSelecionado={setFormaAcionamento}
         />
 
-        {/* Local do Acionamento (Chips) */}
         <SeletorChips 
           label="Local da VTR no Acionamento" 
           opcoes={LISTA_LOCAL_ACIONAMENTO} 
@@ -250,9 +290,15 @@ export default function NovaOcorrenciaScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.button} onPress={iniciarDeslocamento}>
+        <TouchableOpacity 
+          style={[styles.button, salvando && { opacity: 0.7 }]} 
+          onPress={iniciarDeslocamento}
+          disabled={salvando}
+        >
           <MaterialCommunityIcons name="car-emergency" size={24} color="#fff" />
-          <Text style={styles.buttonText}>INICIAR DESLOCAMENTO</Text>
+          <Text style={styles.buttonText}>
+            {salvando ? 'SALVANDO...' : 'INICIAR DESLOCAMENTO'}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

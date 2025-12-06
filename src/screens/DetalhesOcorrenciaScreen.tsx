@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   View, 
   Text, 
@@ -16,40 +16,48 @@ import { styles } from './DetalhesOcorrencia.styles';
 type DetalhesScreenRouteProp = RouteProp<RootStackParamList, 'DetalhesOcorrencia'>;
 
 export default function DetalhesOcorrenciaScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const route = useRoute<DetalhesScreenRouteProp>();
   
-  // Recebe dados da Home (clique no card) ou da Nova Ocorrência (Deslocamento)
-  const { idOcorrencia, dadosIniciais } = route.params || { 
+  // Recebe dados da Home ou da Nova Ocorrência
+  // Agora incluímos o 'dbId' (ID do SQLite)
+  const { idOcorrencia, dadosIniciais, dbId } = route.params || { 
     idOcorrencia: 'OCO-2023-05', 
-    dadosIniciais: {} 
+    dadosIniciais: {},
+    dbId: undefined 
   };
 
-  // Preenche com dados recebidos OU dados mockados (para visualização se vier vazio)
   const ocorrencia = {
     codigo: idOcorrencia,
     status: dadosIniciais?.status || 'Pendente',
-    tipo: dadosIniciais?.natureza || 'Viatura Abandonada',
-    dataHora: dadosIniciais?.horaDespacho || '15/05/2023 10:30',
-    reclamante: dadosIniciais?.solicitante || 'José Paulo',
-    localizacao: dadosIniciais?.endereco || 'Lat: -8.0578, Long: -34.88',
-    descricao: 'Veículo encontrado na rua das Flores em estado de abandono, sem ocupantes e com sinais de vandalismo.'
+    tipo: dadosIniciais?.viatura || 'Viatura Indefinida', // Ajustei para mostrar Viatura
+    dataHora: dadosIniciais?.horaDespacho || '---',
+    reclamante: dadosIniciais?.solicitante || '---',
+    localizacao: dadosIniciais?.grupamento || '---',
+    descricao: 'Ocorrência em andamento. Preencha as etapas abaixo para atualizar.'
   };
 
   // --- AÇÃO: BOTÃO 1 (Etapa 2 e 3) ---
-const handleEtapa2_3 = () => {
-  navigation.navigate('ChegadaCena', { idOcorrencia: idOcorrencia });
-};
+  const handleEtapa2_3 = () => {
+    // Passamos o dbId para a tela de Chegada saber ONDE salvar
+    navigation.navigate('ChegadaCena', { 
+      idOcorrencia: idOcorrencia,
+      dbId: dbId 
+    });
+  };
 
   // --- AÇÃO: BOTÃO 2 (Etapa 4) ---
   const handleEtapa4 = () => {
-        navigation.navigate('RelatorioFinal', { idOcorrencia: idOcorrencia });
+    navigation.navigate('RelatorioFinal', { 
+      idOcorrencia: idOcorrencia,
+      dbId: dbId 
+    });
   };
 
   return (
     <SafeAreaView style={styles.container}>
       
-      {/* 1. Header (Voltar + Título) */}
+      {/* 1. Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Feather name="chevron-left" size={24} color="#333" />
@@ -57,9 +65,8 @@ const handleEtapa2_3 = () => {
         <Text style={styles.headerTitle}>Detalhes do Registro</Text>
       </View>
 
-      {/* 2. BARRA DE AÇÃO (BOTÕES TOPO) - SOLICITADO */}
+      {/* 2. BARRA DE AÇÃO (BOTÕES TOPO) */}
       <View style={styles.actionButtonsContainer}>
-        {/* Botão para Etapa 2 e 3 */}
         <TouchableOpacity 
           style={[styles.stageButton, styles.btnEtapa23]} 
           onPress={handleEtapa2_3}
@@ -68,7 +75,6 @@ const handleEtapa2_3 = () => {
           <Text style={styles.stageButtonText}>CHEGADA / CENA</Text>
         </TouchableOpacity>
 
-        {/* Botão para Etapa 4 */}
         <TouchableOpacity 
           style={[styles.stageButton, styles.btnEtapa4]} 
           onPress={handleEtapa4}
@@ -82,8 +88,9 @@ const handleEtapa2_3 = () => {
         
         {/* 3. Dados Principais */}
         <Text style={styles.ocorrenciaTitle}>Ocorrência {ocorrencia.codigo}</Text>
+        {/* Debug visual para sabermos se o ID do banco chegou (pode remover depois) */}
+        {dbId && <Text style={{fontSize:10, color:'#aaa', marginBottom:10}}>ID Interno: {dbId}</Text>}
 
-        {/* Linha Status */}
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Status</Text>
           <View style={[styles.statusBadge, ocorrencia.status === 'Finalizado' && {backgroundColor: '#4CAF50'}]}>
@@ -91,63 +98,36 @@ const handleEtapa2_3 = () => {
           </View>
         </View>
 
-        {/* Linha Tipo */}
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Tipo</Text>
+          <Text style={styles.detailLabel}>Viatura</Text>
           <Text style={styles.detailValue}>{ocorrencia.tipo}</Text>
         </View>
 
-        {/* Linha Data/Hora */}
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Data/Hora</Text>
           <Text style={styles.detailValue}>{ocorrencia.dataHora}</Text>
         </View>
 
-        {/* Linha Reclamante */}
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Reclamante</Text>
-          <Text style={styles.detailValue}>{ocorrencia.reclamante}</Text>
-        </View>
-
-        {/* Linha GPS */}
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Localização GPS</Text>
+          <Text style={styles.detailLabel}>Grupamento</Text>
           <Text style={styles.detailValue}>{ocorrencia.localizacao}</Text>
         </View>
 
         {/* 4. Mídias e Descrição */}
-        <Text style={styles.sectionHeader}>Mídias</Text>
-        
-        <View style={styles.mediaRow}>
-          {/* Exemplo de imagem de carro queimado (Placeholder) */}
-          <View style={styles.mediaItem}>
-             <Image 
-               source={{ uri: 'https://cdn-icons-png.flaticon.com/512/3097/3097180.png' }} 
-               style={styles.mediaImage} 
-               resizeMode="cover"
-             />
-          </View>
-          {/* Ícone de prancheta */}
-          <View style={[styles.mediaItem, { backgroundColor: '#fff', borderColor: '#ccc' }]}>
-             <FontAwesome5 name="clipboard-list" size={40} color="#888" />
-          </View>
-        </View>
-
+        <Text style={styles.sectionHeader}>Resumo</Text>
         <Text style={styles.descriptionText}>
           {ocorrencia.descricao}
         </Text>
 
-        {/* 5. Botões de Mídia (Cinza) */}
-        <TouchableOpacity style={styles.grayButton}>
-          <FontAwesome5 name="video" size={20} color="#333" />
-          <Text style={styles.grayButtonText}>Adicionar vídeo</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.grayButton}>
+        {/* 5. Botão Timeline */}
+        <TouchableOpacity 
+          style={styles.grayButton}
+          onPress={() => navigation.navigate('Timeline', { idOcorrencia: ocorrencia.codigo })}
+        >
           <MaterialCommunityIcons name="timeline-clock" size={24} color="#333" />
           <Text style={styles.grayButtonText}>Timeline da ocorrência</Text>
         </TouchableOpacity>
-
+        
       </ScrollView>
     </SafeAreaView>
   );

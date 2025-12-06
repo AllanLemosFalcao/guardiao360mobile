@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -8,9 +8,15 @@ import {
   ScrollView, 
   Alert 
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { styles } from './ChegadaCenaScreen.styles';
+import { RootStackParamList } from '../../App';
+
+// Importando função de banco
+import { executeSql } from '../services/db';
+
+type ChegadaCenaRouteProp = RouteProp<RootStackParamList, 'ChegadaCena'>;
 
 // --- LISTAS DE OPÇÕES ---
 const LISTA_REGIOES = ['RMR', 'SERTÃO', 'ZONA DA MATA'];
@@ -26,12 +32,10 @@ const LISTA_TIPO_LOGRADOURO = [
   'Alameda', 'Av', 'BR', 'Pe', 'Praça', 'Rua', 'Travessa', 'Outro'
 ];
 
-// --- COMPONENTE: INPUT COM SUGESTÃO (Fora da função principal) ---
+// --- COMPONENTE: INPUT COM SUGESTÃO ---
 const InputComSugestao = ({ label, value, setValue, listaOpcoes, placeholder, zIndexVal = 1 }: any) => {
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
   
-  // 1. Filtra a lista. Se o valor for vazio "", o includes retorna true para todos, 
-  // mostrando a lista completa ao clicar.
   const sugestoesFiltradas = listaOpcoes.filter((item: string) => 
     item.toUpperCase().includes(value.toUpperCase())
   );
@@ -46,21 +50,12 @@ const InputComSugestao = ({ label, value, setValue, listaOpcoes, placeholder, zI
           setValue(text);
           setMostrarSugestoes(true);
         }}
-        // Ao clicar no campo (Foco), mostramos a lista imediatamente
         onFocus={() => setMostrarSugestoes(true)}
-        
-        // Pequeno delay ao sair para dar tempo de clicar na opção
         onBlur={() => setTimeout(() => setMostrarSugestoes(false), 200)}
         placeholder={placeholder}
       />
-      
-      {/* ALTERAÇÃO AQUI: 
-         Removemos a checagem "value.length > 0". 
-         Agora só verificamos se "mostrarSugestoes" é true e se a lista tem itens.
-      */}
       {mostrarSugestoes && sugestoesFiltradas.length > 0 && (
         <View style={styles.suggestionsBox}>
-          {/* Aumentei o slice para 50 para mostrar todas as opções se não digitar nada */}
           {sugestoesFiltradas.slice(0, 50).map((item: string, index: number) => (
             <TouchableOpacity 
               key={index} 
@@ -81,6 +76,10 @@ const InputComSugestao = ({ label, value, setValue, listaOpcoes, placeholder, zI
 
 export default function ChegadaCenaScreen() {
   const navigation = useNavigation();
+  const route = useRoute<ChegadaCenaRouteProp>();
+
+  // Recebe o ID do Banco (dbId) vindo da tela anterior
+  const { idOcorrencia, dbId } = route.params || { idOcorrencia: '---', dbId: 0 };
   
   // --- ESTADOS DE DADOS ---
   const [chegadaRegistrada, setChegadaRegistrada] = useState(false);
@@ -96,36 +95,106 @@ export default function ChegadaCenaScreen() {
   const [tipoLogradouro, setTipoLogradouro] = useState('');
   const [logradouro, setLogradouro] = useState('');
   const [numeroKm, setNumeroKm] = useState('');
-  const [complemento, setComplemento] = useState(''); // Apto/Sala
+  const [complemento, setComplemento] = useState(''); 
   const [referencia, setReferencia] = useState('');
 
-  // --- FUNÇÃO 1: CAPTURAR QTA (GPS + HORA) ---
-  const handleCapturarQTA = () => {
+  // Estados de Carregamento
+  const [salvandoQTA, setSalvandoQTA] = useState(false);
+  const [salvandoTudo, setSalvandoTudo] = useState(false);
+
+  // --- FUNÇÃO 1: CAPTURAR QTA (GPS + HORA) E SALVAR ---
+  const handleCapturarQTA = async () => {
+    if (!dbId) {
+      Alert.alert("Erro", "Ocorrência não identificada no banco de dados.");
+      return;
+    }
+
+    setSalvandoQTA(true);
+    
+    // Simulação de Dados (Depois substituiremos por GPS Real)
     const horaAtual = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const latSimulada = '-8.051706'; 
     const longSimulada = '-34.890344';
 
-    setHorarioChegada(horaAtual);
-    setCoordenadas({ lat: latSimulada, long: longSimulada });
-    setChegadaRegistrada(true);
-    Alert.alert("Sucesso", "QTA registrado com sucesso!");
+    try {
+      // ATUALIZAÇÃO NO BANCO (UPDATE)
+      await executeSql(
+        `UPDATE ocorrencias SET 
+          data_hora_chegada_local = ?,
+          latitude_chegada = ?,
+          longitude_chegada = ?
+         WHERE id = ?;`,
+        [horaAtual, latSimulada, longSimulada, dbId]
+      );
+
+      // Atualiza a tela visualmente
+      setHorarioChegada(horaAtual);
+      setCoordenadas({ lat: latSimulada, long: longSimulada });
+      setChegadaRegistrada(true);
+      
+      Alert.alert("Sucesso", "Horário e Local de Chegada salvos no banco!");
+
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Erro", "Falha ao salvar QTA no banco local.");
+    } finally {
+      setSalvandoQTA(false);
+    }
   };
 
-  // --- FUNÇÃO 2: CÂMERA ---
+  // --- FUNÇÃO 2: CÂMERA (Placeholder) ---
   const handleCamera = (tipo: 'foto' | 'video') => {
-    Alert.alert("Câmera", `Abrindo câmera para capturar ${tipo}...`);
-    // Aqui integraria com 'expo-image-picker' ou 'expo-camera'
+    Alert.alert("Câmera", `Abrindo câmera para capturar ${tipo}... (Implementação na próxima etapa)`);
   };
 
-  // --- FUNÇÃO 3: SALVAR ---
-  const handleSalvar = () => {
+  // --- FUNÇÃO 3: SALVAR DADOS DO FORMULÁRIO ---
+  const handleSalvar = async () => {
     if (!chegadaRegistrada) {
       Alert.alert("Atenção", "Registre a chegada (botão verde) antes de salvar.");
       return;
     }
-    // Salvar no estado global ou banco
-    Alert.alert("Salvo", "Dados de localização salvos com sucesso.");
-    navigation.goBack();
+
+    if (!dbId) return;
+
+    setSalvandoTudo(true);
+
+    try {
+      // UPDATE COM O RESTANTE DOS DADOS
+      await executeSql(
+        `UPDATE ocorrencias SET 
+          regiao = ?,
+          ais = ?,
+          municipio = ?,
+          bairro = ?,
+          tipo_logradouro = ?,
+          logradouro = ?,
+          numero_km = ?,
+          complemento = ?,
+          ponto_referencia = ?
+         WHERE id = ?;`,
+        [
+          regiao,
+          ais,
+          municipio,
+          bairro,
+          tipoLogradouro,
+          logradouro,
+          numeroKm,
+          complemento,
+          referencia,
+          dbId
+        ]
+      );
+
+      Alert.alert("Salvo", "Dados da Etapa 2 atualizados com sucesso.");
+      navigation.goBack(); // Volta para Detalhes
+
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Erro", "Falha ao salvar endereço no banco.");
+    } finally {
+      setSalvandoTudo(false);
+    }
   };
 
   return (
@@ -140,13 +209,22 @@ export default function ChegadaCenaScreen() {
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         
+        {/* Debug ID (opcional) */}
+        {/* <Text style={{fontSize:10, color:'#ccc'}}>DB ID: {dbId}</Text> */}
+
         {/* --- BOTÃO DE CHEGADA (TOPO) --- */}
         <View style={styles.qtaCard}>
           <Text style={styles.qtaTitle}>Registro de Chegada (QTA)</Text>
           {!chegadaRegistrada ? (
-            <TouchableOpacity style={styles.btnCaptura} onPress={handleCapturarQTA}>
+            <TouchableOpacity 
+              style={[styles.btnCaptura, salvandoQTA && { opacity: 0.7 }]} 
+              onPress={handleCapturarQTA}
+              disabled={salvandoQTA}
+            >
               <MaterialCommunityIcons name="crosshairs-gps" size={24} color="#fff" />
-              <Text style={styles.btnCapturaText}>REGISTRAR HORA E GPS</Text>
+              <Text style={styles.btnCapturaText}>
+                {salvandoQTA ? 'SALVANDO...' : 'REGISTRAR HORA E GPS'}
+              </Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.dataContainer}>
@@ -275,8 +353,14 @@ export default function ChegadaCenaScreen() {
         </View>
 
         {/* Botão Salvar */}
-        <TouchableOpacity style={styles.saveButton} onPress={handleSalvar}>
-          <Text style={styles.saveButtonText}>SALVAR DADOS</Text>
+        <TouchableOpacity 
+          style={[styles.saveButton, salvandoTudo && { opacity: 0.7 }]} 
+          onPress={handleSalvar}
+          disabled={salvandoTudo}
+        >
+          <Text style={styles.saveButtonText}>
+            {salvandoTudo ? 'ATUALIZANDO...' : 'SALVAR DADOS'}
+          </Text>
         </TouchableOpacity>
 
       </ScrollView>

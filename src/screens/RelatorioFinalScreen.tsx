@@ -6,16 +6,20 @@ import {
   TouchableOpacity, 
   SafeAreaView, 
   ScrollView, 
-  Alert,
-  Platform
+  Alert
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import { styles } from './RelatorioFinalScreen.styles';
+import { RootStackParamList } from '../../App';
 
-// --- LISTAS DE DADOS (Extraídos do seu pedido) ---
+// Importa a função de banco de dados
+import { executeSql } from '../services/db';
+
+type RelatorioFinalRouteProp = RouteProp<RootStackParamList, 'RelatorioFinal'>;
+
+// --- LISTAS DE DADOS (Mantidas as mesmas) ---
 const LISTA_NATUREZA = ['APH', 'Atividade Comunitária', 'Incêndio', 'Prevenção', 'Produtos Perigosos', 'Salvamento'];
-
 const LISTA_GRUPO = [
   'Acidente de Trânsito Atropelamento', 'Acidente de Transito Capotamento', 'Acidente de Transito Choque', 
   'Acidente de transito colisão abalroamento', 'Acidentes diversos', 'APH Diversos', 'Apoio em operações', 
@@ -30,7 +34,6 @@ const LISTA_GRUPO = [
   'Queda', 'Queimadura elétrica/choque', 'Salvamento diverso', 'Trauma por objeto contundente', 
   'Trauma por objeto perfuro cortante', 'Trem de socorro', 'Vazamento', 'Vítima de agressão'
 ];
-
 const LISTA_SUBGRUPO = [
   'Abastecimento de Água', 'Açougue, Frigorífico, Matadouro ou Similar', 'Afogamento', 'Agência Bancária', 
   'Agência de Câmbio ou Similar', 'Aglomerado Subnormal Favela', 'Alimentícia', 'Apoio à Instituição', 
@@ -64,34 +67,16 @@ const LISTA_SUBGRUPO = [
   'Transporte de bem ou Produto', 'Transporte de Vítima', 'Unifamiliar Casa Residência', 'Van ou Similar', 
   'Veículo de Carga Não Perigosa', 'Veículo de Carga Perigosa'
 ];
-
 const LISTA_SITUACAO = ['Atendida', 'Não Atendida'];
 const LISTA_NAO_ATENDIDA = ['Cancelada', 'Sem atuação/Motivo', 'Trote'];
-const LISTA_SEM_ATUACAO = [
-  'Não se aplica', 'Recusou atendimento', 'Situação já solucionada', 
-  'Vítima socorrida pelo SAMU', 'Vítima socorrida por populares', 'Outro'
-];
+const LISTA_SEM_ATUACAO = ['Não se aplica', 'Recusou atendimento', 'Situação já solucionada', 'Vítima socorrida pelo SAMU', 'Vítima socorrida por populares', 'Outro'];
+const LISTA_DESTINO = ['Encaminhada ao suporte avançado', 'Encaminhado ao suporte aeromédico', 'Encaminhado ao suporte básico', 'Entregue ao Hospital', 'Permaneceu no local após atendimento', 'Recusou atendimento'];
+const LISTA_HOSPITAIS = ['Hospital da restauração', 'Hospital Hapvida', 'Hospital Metropolitano Sul - Dom Helder Câmara', 'Hospital Real Português', 'Hospital São Lucas', 'UPA Barra de Jangada - Senador Wilson Campos', 'UPA Ibura - Pediatra Zilda Arns', 'UPA Imbiribeira - Maria Esther Souto Carvalho', 'Outro'];
 
-const LISTA_DESTINO = [
-  'Encaminhada ao suporte avançado', 'Encaminhado ao suporte aeromédico', 
-  'Encaminhado ao suporte básico', 'Entregue ao Hospital', 
-  'Permaneceu no local após atendimento', 'Recusou atendimento'
-];
-
-const LISTA_HOSPITAIS = [
-  'Hospital da restauração', 'Hospital Hapvida', 'Hospital Metropolitano Sul - Dom Helder Câmara', 
-  'Hospital Real Português', 'Hospital São Lucas', 'UPA Barra de Jangada - Senador Wilson Campos', 
-  'UPA Ibura - Pediatra Zilda Arns', 'UPA Imbiribeira - Maria Esther Souto Carvalho', 'Outro'
-];
-
-// --- COMPONENTE: INPUT COM SUGESTÃO (AUTOCOMPLETE) ---
+// --- COMPONENTE: INPUT COM SUGESTÃO ---
 const InputComSugestao = ({ label, value, setValue, listaOpcoes, placeholder, zIndexVal = 1 }: any) => {
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
-  
-  // Filtra. Se vazio, mostra todos.
-  const sugestoesFiltradas = listaOpcoes.filter((item: string) => 
-    item.toUpperCase().includes(value.toUpperCase())
-  );
+  const sugestoesFiltradas = listaOpcoes.filter((item: string) => item.toUpperCase().includes(value.toUpperCase()));
 
   return (
     <View style={[styles.inputGroup, { zIndex: mostrarSugestoes ? 100 : zIndexVal }]}>
@@ -99,12 +84,8 @@ const InputComSugestao = ({ label, value, setValue, listaOpcoes, placeholder, zI
       <TextInput 
         style={styles.input}
         value={value}
-        onChangeText={(text) => {
-          setValue(text);
-          setMostrarSugestoes(true);
-        }}
+        onChangeText={(text) => { setValue(text); setMostrarSugestoes(true); }}
         onFocus={() => setMostrarSugestoes(true)}
-        // Delay para permitir o clique
         onBlur={() => setTimeout(() => setMostrarSugestoes(false), 200)}
         placeholder={placeholder}
       />
@@ -112,12 +93,8 @@ const InputComSugestao = ({ label, value, setValue, listaOpcoes, placeholder, zI
         <View style={styles.suggestionsBox}>
           {sugestoesFiltradas.slice(0, 50).map((item: string, index: number) => (
             <TouchableOpacity 
-              key={index} 
-              style={styles.suggestionItem}
-              onPress={() => {
-                setValue(item);
-                setMostrarSugestoes(false);
-              }}
+              key={index} style={styles.suggestionItem}
+              onPress={() => { setValue(item); setMostrarSugestoes(false); }}
             >
               <Text style={styles.suggestionText}>{item}</Text>
             </TouchableOpacity>
@@ -128,7 +105,6 @@ const InputComSugestao = ({ label, value, setValue, listaOpcoes, placeholder, zI
   );
 };
 
-// --- COMPONENTE: RADIO BUTTON GROUP ---
 const RadioGroup = ({ label, opcoes, selecionado, setSelecionado }: any) => (
   <View style={styles.inputGroup}>
     <Text style={styles.label}>{label}</Text>
@@ -139,9 +115,7 @@ const RadioGroup = ({ label, opcoes, selecionado, setSelecionado }: any) => (
           style={[styles.radioButton, selecionado === op && styles.radioButtonSelected]}
           onPress={() => setSelecionado(op)}
         >
-          <Text style={[styles.radioText, selecionado === op && styles.radioTextSelected]}>
-            {op}
-          </Text>
+          <Text style={[styles.radioText, selecionado === op && styles.radioTextSelected]}>{op}</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -149,29 +123,35 @@ const RadioGroup = ({ label, opcoes, selecionado, setSelecionado }: any) => (
 );
 
 export default function RelatorioFinalScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>(); // Usando 'any' para facilitar reset
+  const route = useRoute<RelatorioFinalRouteProp>();
+  
+  // Recebe ID do Banco
+  const { dbId } = route.params || { dbId: 0 };
   
   // --- ESTADOS: CLASSIFICAÇÃO ---
   const [natureza, setNatureza] = useState('');
   const [grupo, setGrupo] = useState('');
   const [subgrupo, setSubgrupo] = useState('');
   
-  const [situacao, setSituacao] = useState('Atendida'); // Atendida ou Não
+  const [situacao, setSituacao] = useState('Atendida');
   const [motivoNaoAtendida, setMotivoNaoAtendida] = useState('');
   const [detalheSemAtuacao, setDetalheSemAtuacao] = useState('');
   
   const [horaSaidaLocal, setHoraSaidaLocal] = useState(new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}));
+  
+  // --- ESTADOS: HISTÓRICO (IMPORTANTE) ---
+  const [historico, setHistorico] = useState('');
 
   // --- ESTADOS: VÍTIMA ---
   const [vitimaEnvolvida, setVitimaEnvolvida] = useState('Não');
   const [nomeVitima, setNomeVitima] = useState('');
   const [sexoVitima, setSexoVitima] = useState('');
   const [idadeVitima, setIdadeVitima] = useState('');
-  const [classificacaoVitima, setClassificacaoVitima] = useState(''); // Fatal, Ferida...
+  const [classificacaoVitima, setClassificacaoVitima] = useState('');
   const [destinoVitima, setDestinoVitima] = useState('');
   const [tipoHospital, setTipoHospital] = useState('');
   const [hospitalPublico, setHospitalPublico] = useState('');
-  
   const [sofreuAcidente, setSofreuAcidente] = useState('Não');
   const [segurancaVitima, setSegurancaVitima] = useState('');
   const [etnia, setEtnia] = useState('');
@@ -179,10 +159,15 @@ export default function RelatorioFinalScreen() {
 
   // --- ESTADOS: CHEFIA ---
   const [chefeGuarnicao, setChefeGuarnicao] = useState('');
+  const [salvando, setSalvando] = useState(false);
 
   // --- FUNÇÃO FINALIZAR ---
-  const handleFinalizar = () => {
-    // Validação básica
+  const handleFinalizar = async () => {
+    if (!dbId) {
+      Alert.alert("Erro", "Ocorrência não encontrada no banco.");
+      return;
+    }
+
     if (!natureza || !grupo || !chefeGuarnicao) {
       Alert.alert("Campos Obrigatórios", "Preencha Natureza, Grupo e Chefe da Guarnição.");
       return;
@@ -190,17 +175,66 @@ export default function RelatorioFinalScreen() {
 
     Alert.alert(
       "Confirmar Envio",
-      "Confirma o fechamento desta ocorrência? Os dados não poderão ser editados depois.",
+      "Confirma o fechamento desta ocorrência? Os dados serão salvos localmente.",
       [
         { text: "Revisar", style: "cancel" },
         { 
-          text: "ENVIAR RELATÓRIO", 
-          onPress: () => {
-            Alert.alert("Sucesso", "Ocorrência finalizada e enviada ao sistema!");
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'MainTabs' as never }],
-            });
+          text: "FINALIZAR AGORA", 
+          onPress: async () => {
+            setSalvando(true);
+            try {
+              // 1. UPDATE na Ocorrência (Status = FINALIZADO)
+              await executeSql(
+                `UPDATE ocorrencias SET 
+                  natureza_final = ?,
+                  grupo = ?,
+                  subgrupo = ?,
+                  situacao_ocorrencia = ?,
+                  motivo_nao_atendida = ?,
+                  detalhe_sem_atuacao = ?,
+                  historico_final = ?,
+                  chefe_guarnicao = ?,
+                  hora_saida_local = ?,
+                  status = 'FINALIZADO'
+                 WHERE id = ?;`,
+                [
+                  natureza, grupo, subgrupo, situacao, 
+                  motivoNaoAtendida, detalheSemAtuacao, 
+                  historico, chefeGuarnicao, horaSaidaLocal,
+                  dbId
+                ]
+              );
+
+              // 2. INSERT na Tabela de Vítimas (Se houver)
+              if (vitimaEnvolvida === 'Sim') {
+                await executeSql(
+                  `INSERT INTO vitimas (
+                    ocorrencia_id, nome, sexo, idade, classificacao, 
+                    etnia, lgbt, destino, tipo_hospital, nome_hospital, 
+                    sofreu_acidente_transito, condicao_seguranca
+                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+                  [
+                    dbId, nomeVitima, sexoVitima, idadeVitima, classificacaoVitima,
+                    etnia, lgbt, destinoVitima, tipoHospital, hospitalPublico,
+                    sofreuAcidente, segurancaVitima
+                  ]
+                );
+              }
+
+              Alert.alert("Sucesso", "Ocorrência finalizada e salva no banco local!");
+              
+              // Reseta a navegação voltando para a Home
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'MainTabs' }],
+              });
+
+            } catch (error) {
+              console.error(error);
+              Alert.alert("Erro", "Falha ao salvar relatório final.");
+            } finally {
+              setSalvando(false);
+            }
           }
         }
       ]
@@ -221,68 +255,46 @@ export default function RelatorioFinalScreen() {
         {/* === SEÇÃO 1: CLASSIFICAÇÃO === */}
         <View style={[styles.sectionCard, { zIndex: 30 }]}>
           <Text style={styles.sectionTitle}>1. Classificação da Ocorrência</Text>
-          
-          <InputComSugestao 
-            label="Natureza" value={natureza} setValue={setNatureza} 
-            listaOpcoes={LISTA_NATUREZA} placeholder="Selecione..." zIndexVal={30}
-          />
-          <InputComSugestao 
-            label="Grupo" value={grupo} setValue={setGrupo} 
-            listaOpcoes={LISTA_GRUPO} placeholder="Selecione..." zIndexVal={29}
-          />
-          <InputComSugestao 
-            label="Subgrupo" value={subgrupo} setValue={setSubgrupo} 
-            listaOpcoes={LISTA_SUBGRUPO} placeholder="Selecione..." zIndexVal={28}
+          <InputComSugestao label="Natureza" value={natureza} setValue={setNatureza} listaOpcoes={LISTA_NATUREZA} placeholder="Selecione..." zIndexVal={30} />
+          <InputComSugestao label="Grupo" value={grupo} setValue={setGrupo} listaOpcoes={LISTA_GRUPO} placeholder="Selecione..." zIndexVal={29} />
+          <InputComSugestao label="Subgrupo" value={subgrupo} setValue={setSubgrupo} listaOpcoes={LISTA_SUBGRUPO} placeholder="Selecione..." zIndexVal={28} />
+        </View>
+
+        {/* === SEÇÃO 2: HISTÓRICO (Adicionado Text Area) === */}
+        <View style={[styles.sectionCard, { zIndex: 25 }]}>
+          <Text style={styles.sectionTitle}>2. Histórico (Resumo)</Text>
+          <TextInput 
+            style={[styles.input, { height: 100, textAlignVertical: 'top' }]} 
+            multiline={true}
+            numberOfLines={4}
+            placeholder="Descreva o que aconteceu..."
+            value={historico}
+            onChangeText={setHistorico}
           />
         </View>
 
-        {/* === SEÇÃO 2: SITUAÇÃO === */}
+        {/* === SEÇÃO 3: SITUAÇÃO === */}
         <View style={[styles.sectionCard, { zIndex: 20 }]}>
-          <Text style={styles.sectionTitle}>2. Situação do Atendimento</Text>
+          <Text style={styles.sectionTitle}>3. Situação do Atendimento</Text>
+          <RadioGroup label="Situação da Ocorrência" opcoes={LISTA_SITUACAO} selecionado={situacao} setSelecionado={setSituacao} />
           
-          <RadioGroup 
-            label="Situação da Ocorrência" 
-            opcoes={LISTA_SITUACAO} 
-            selecionado={situacao} setSelecionado={setSituacao} 
-          />
-
-          {/* Condicional: Se NÃO ATENDIDA */}
           {situacao === 'Não Atendida' && (
-            <RadioGroup 
-              label="Motivo Não Atendida" 
-              opcoes={LISTA_NAO_ATENDIDA} 
-              selecionado={motivoNaoAtendida} setSelecionado={setMotivoNaoAtendida} 
-            />
+            <RadioGroup label="Motivo Não Atendida" opcoes={LISTA_NAO_ATENDIDA} selecionado={motivoNaoAtendida} setSelecionado={setMotivoNaoAtendida} />
           )}
-
-          {/* Condicional: Se SEM ATUAÇÃO */}
           {motivoNaoAtendida === 'Sem atuação/Motivo' && (
-            <InputComSugestao 
-              label="Detalhe Sem Atuação" value={detalheSemAtuacao} setValue={setDetalheSemAtuacao} 
-              listaOpcoes={LISTA_SEM_ATUACAO} placeholder="Selecione..." zIndexVal={20}
-            />
+            <InputComSugestao label="Detalhe Sem Atuação" value={detalheSemAtuacao} setValue={setDetalheSemAtuacao} listaOpcoes={LISTA_SEM_ATUACAO} placeholder="Selecione..." zIndexVal={20} />
           )}
-
+          
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Horário de Saída do Local</Text>
-            <TextInput 
-              style={styles.input} 
-              value={horaSaidaLocal} 
-              onChangeText={setHoraSaidaLocal}
-              keyboardType="numbers-and-punctuation"
-            />
+            <TextInput style={styles.input} value={horaSaidaLocal} onChangeText={setHoraSaidaLocal} keyboardType="numbers-and-punctuation" />
           </View>
         </View>
 
-        {/* === SEÇÃO 3: VÍTIMA (Condicional) === */}
+        {/* === SEÇÃO 4: VÍTIMA === */}
         <View style={[styles.sectionCard, { zIndex: 10 }]}>
-          <Text style={styles.sectionTitle}>3. Dados da Vítima</Text>
-          
-          <RadioGroup 
-            label="Vítima Envolvida?" 
-            opcoes={['Sim', 'Não']} 
-            selecionado={vitimaEnvolvida} setSelecionado={setVitimaEnvolvida} 
-          />
+          <Text style={styles.sectionTitle}>4. Dados da Vítima</Text>
+          <RadioGroup label="Vítima Envolvida?" opcoes={['Sim', 'Não']} selecionado={vitimaEnvolvida} setSelecionado={setVitimaEnvolvida} />
 
           {vitimaEnvolvida === 'Sim' && (
             <>
@@ -290,67 +302,50 @@ export default function RelatorioFinalScreen() {
                 <Text style={styles.label}>Nome da Vítima</Text>
                 <TextInput style={styles.input} value={nomeVitima} onChangeText={setNomeVitima} />
               </View>
-
               <RadioGroup label="Sexo" opcoes={['M', 'F', 'Não identificado']} selecionado={sexoVitima} setSelecionado={setSexoVitima} />
-              
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Idade</Text>
                 <TextInput style={styles.input} value={idadeVitima} onChangeText={setIdadeVitima} keyboardType="numeric" />
               </View>
-
               <RadioGroup label="Classificação" opcoes={['Fatal', 'Ferida', 'Ilesa']} selecionado={classificacaoVitima} setSelecionado={setClassificacaoVitima} />
               <RadioGroup label="Etnia" opcoes={['Branca', 'Negra', 'Parda']} selecionado={etnia} setSelecionado={setEtnia} />
               <RadioGroup label="Identifica-se LGBTQIA+?" opcoes={['Sim', 'Não', 'Prefere não responder']} selecionado={lgbt} setSelecionado={setLgbt} />
 
-              <InputComSugestao 
-                label="Destino da Vítima" value={destinoVitima} setValue={setDestinoVitima} 
-                listaOpcoes={LISTA_DESTINO} placeholder="Selecione..." zIndexVal={15}
-              />
+              <InputComSugestao label="Destino da Vítima" value={destinoVitima} setValue={setDestinoVitima} listaOpcoes={LISTA_DESTINO} placeholder="Selecione..." zIndexVal={15} />
 
-              {/* Se foi para Hospital */}
               {destinoVitima === 'Entregue ao Hospital' && (
                 <>
                   <RadioGroup label="Tipo de Hospital" opcoes={['Hospital particular', 'Hospital público estadual', 'UPA', 'UPAE']} selecionado={tipoHospital} setSelecionado={setTipoHospital} />
-                  
-                  {(tipoHospital === 'Hospital público estadual' || tipoHospital === 'UPA' || tipoHospital === 'UPAE') && (
-                    <InputComSugestao 
-                      label="Nome do Hospital Público" value={hospitalPublico} setValue={setHospitalPublico} 
-                      listaOpcoes={LISTA_HOSPITAIS} placeholder="Selecione..." zIndexVal={14}
-                    />
+                  {(['Hospital público estadual', 'UPA', 'UPAE'].includes(tipoHospital)) && (
+                    <InputComSugestao label="Nome do Hospital Público" value={hospitalPublico} setValue={setHospitalPublico} listaOpcoes={LISTA_HOSPITAIS} placeholder="Selecione..." zIndexVal={14} />
                   )}
                 </>
               )}
-
-              <RadioGroup label="Sofreu acidente de trânsito?" opcoes={['Sim', 'Não']} selecionado={sofreuAcidente} setSelecionado={setSofreuAcidente} />
               
+              <RadioGroup label="Sofreu acidente de trânsito?" opcoes={['Sim', 'Não']} selecionado={sofreuAcidente} setSelecionado={setSofreuAcidente} />
               {sofreuAcidente === 'Sim' && (
-                <RadioGroup 
-                  label="Condição de Segurança" 
-                  opcoes={['Com airbag', 'Com capacete', 'Com cinto de segurança', 'Sem capacete', 'Não se aplica', 'Outro']} 
-                  selecionado={segurancaVitima} setSelecionado={setSegurancaVitima} 
-                />
+                <RadioGroup label="Condição de Segurança" opcoes={['Com airbag', 'Com capacete', 'Com cinto de segurança', 'Sem capacete', 'Não se aplica', 'Outro']} selecionado={segurancaVitima} setSelecionado={setSegurancaVitima} />
               )}
             </>
           )}
         </View>
 
-        {/* === SEÇÃO 4: RESPONSÁVEL === */}
+        {/* === SEÇÃO 5: RESPONSÁVEL === */}
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>4. Responsável</Text>
+          <Text style={styles.sectionTitle}>5. Responsável</Text>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Chefe da Guarnição (Nome/Matrícula)</Text>
-            <TextInput 
-              style={styles.input} 
-              placeholder="Digite o nome"
-              value={chefeGuarnicao}
-              onChangeText={setChefeGuarnicao}
-            />
+            <TextInput style={styles.input} placeholder="Digite o nome" value={chefeGuarnicao} onChangeText={setChefeGuarnicao} />
           </View>
         </View>
 
         {/* --- BOTÃO FINAL --- */}
-        <TouchableOpacity style={styles.submitButton} onPress={handleFinalizar}>
-          <Text style={styles.submitButtonText}>ENVIAR RELATÓRIO FINAL</Text>
+        <TouchableOpacity 
+          style={[styles.submitButton, salvando && { opacity: 0.7 }]} 
+          onPress={handleFinalizar}
+          disabled={salvando}
+        >
+          <Text style={styles.submitButtonText}>{salvando ? 'ENVIANDO...' : 'ENVIAR RELATÓRIO FINAL'}</Text>
         </TouchableOpacity>
 
       </ScrollView>

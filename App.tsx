@@ -1,4 +1,4 @@
-import React from 'react';
+import { React, useEffect } from 'react';
 import { View, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -17,6 +17,10 @@ import MapaScreen from './src/screens/MapaScreen';
 import DetalhesOcorrenciaScreen from './src/screens/DetalhesOcorrenciaScreen';
 import ChegadaCenaScreen from './src/screens/ChegadaCenaScreen';
 import RelatorioFinalScreen from './src/screens/RelatorioFinalScreen';
+import TimelineScreen from './src/screens/TimelineScreen';
+
+// Banco offiline (SQLite)
+import { initDB } from './src/services/db';
 
 // --- TIPAGEM ---
 export type RootStackParamList = {
@@ -30,6 +34,7 @@ export type RootStackParamList = {
     dadosIniciais: any; 
     ChegadaCena: { idOcorrencia: string }; // etapa 2 formulario
     RelatorioFinal: { idOcorrencia: string };
+    Timeline: { idOcorrencia: string };
   };
 };
 
@@ -132,6 +137,16 @@ function AppTabs() {
 
 // --- APP PRINCIPAL ---
 export default function App() {
+        // --- INICIALIZAÇÃO DO BANCO ---
+        useEffect(() => {
+          initDB()
+            .then(() => {
+              console.log('Banco de Dados Local Inicializado com Sucesso!');
+            })
+            .catch((err) => {
+              console.log('Falha ao criar banco de dados: ', err);
+            });
+        }, []);
   return (
     <NavigationContainer>
       <StatusBar style="dark" backgroundColor="#ffffff" />
@@ -172,7 +187,7 @@ export default function App() {
             headerBackVisible: false // Impede voltar acidentalmente
           }} 
         />
-
+        <Stack.Screen name="Timeline" component={TimelineScreen} />
         <Stack.Screen 
           name="ChegadaCena" 
           component={ChegadaCenaScreen}
