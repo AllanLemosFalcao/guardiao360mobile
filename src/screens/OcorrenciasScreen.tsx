@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -6,205 +6,174 @@ import {
   TouchableOpacity, 
   SafeAreaView,
   ScrollView,
-  ListRenderItem 
+  ListRenderItem,
+  Alert
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App'; // Ajuste o caminho conforme sua estrutura
+import { RootStackParamList } from '../../App'; 
+import { styles } from './OcorrenciasScreen.styles'; // Certifique-se que o nome do arquivo style está correto
 
-// Importação do estilo separado
-import { styles } from './OcorrenciasScreen.styles';
+// Importa a função do Banco
+import { executeSql } from '../services/db';
 
-// Tipagem para navegação
 type OcorrenciasScreenProp = NativeStackNavigationProp<RootStackParamList, 'Ocorrencias'>;
 
-// Tipagem dos dados
-type Ocorrencia = {
-  id: string;
-  codigo: string;
-  dataHora: string;
-  viatura: string;
-  natureza: string;
-  status: 'Ativa' | 'Analise' | 'Concluida' | 'Pendente';
+// Tipagem baseada no Banco de Dados
+type OcorrenciaBD = {
+  id: number;
+  numero_ocorrencia: string;
+  data_acionamento: string;
+  hora_acionamento: string;
+  tipo_viatura: string;
+  numero_viatura: string;
+  natureza_final: string;
+  status: string;
 };
-
-// DADOS MOCKADOS (Simulação do Banco de Dados)
-const ATIVAS_MOCK: Ocorrencia[] = [
-  { id: '1', codigo: 'OCO-2025-01', dataHora: 'Hoje 14:30', viatura: 'ABT-12', natureza: 'Incêndio', status: 'Ativa' },
-  { id: '2', codigo: 'OCO-2025-02', dataHora: 'Hoje 10:00', viatura: 'ABS-04', natureza: 'Vistoria', status: 'Analise' },
-];
-
-const HISTORICO_MOCK: Ocorrencia[] = Array.from({ length: 12 }).map((_, i) => ({
-  id: String(i + 10),
-  codigo: `OCO-2023-${30 + i}`,
-  dataHora: '15/05/2023 10:30',
-  viatura: 'UR-05',
-  natureza: i % 2 === 0 ? 'APH' : 'Salvamento',
-  status: i % 3 === 0 ? 'Pendente' : 'Concluida',
-}));
 
 export default function OcorrenciasScreen() {
   const navigation = useNavigation<OcorrenciasScreenProp>();
   
-  // Estado para os Filtros
-  const [filtroSelecionado, setFiltroSelecionado] = useState<'Todos' | 'Pendente' | 'Concluida'>('Todos');
+  // Estado para armazenar os dados REAIS do banco
+  const [listaOcorrencias, setListaOcorrencias] = useState<OcorrenciaBD[]>([]);
+  const [filtroSelecionado, setFiltroSelecionado] = useState<'Todos' | 'Rascunho' | 'Finalizado'>('Todos');
+  const [carregando, setCarregando] = useState(false);
 
-  // Lógica de Filtragem
-  const dadosFiltrados = HISTORICO_MOCK.filter(item => {
-    if (filtroSelecionado === 'Todos') return true;
-    return item.status === filtroSelecionado;
-  });
+  // --- FUNÇÃO PARA BUSCAR DADOS DO SQLITE ---
+  const carregarDados = async () => {
+    setCarregando(true);
+    try {
+      // O comando SELECT busca tudo o que foi salvo
+      // ORDER BY id DESC faz aparecer as mais recentes no topo
+      const resultado = await executeSql(
+        `SELECT * FROM ocorrencias ORDER BY id DESC;`
+      );
 
-  // --- Render Item: Ocorrência ATIVA (Horizontal) ---
-  // Ao clicar aqui, também leva para detalhes, pois é uma ocorrência em andamento
-  const renderActiveItem: ListRenderItem<Ocorrencia> = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.activeCard} 
-      activeOpacity={0.8}
-      onPress={() => navigation.navigate('DetalhesOcorrencia', { 
-        idOcorrencia: item.codigo,
-        dadosIniciais: {
-          natureza: item.natureza,
-          horaDespacho: item.dataHora,
-          status: item.status,
-          viatura: item.viatura
-        }
-      })}
-    >
-      <View style={styles.activeCardHeader}>
-        <Text style={{fontWeight: 'bold', fontSize: 16}}>{item.codigo}</Text>
-        <Text style={[
-          styles.activeLabel, 
-          item.status === 'Analise' && { color: '#1976D2', backgroundColor: '#E3F2FD' }
-        ]}>
-          {item.status === 'Ativa' ? 'EM ANDAMENTO' : 'EM ANÁLISE'}
-        </Text>
-      </View>
-      <Text style={styles.cardLabel}>Natureza: <Text style={styles.cardValue}>{item.natureza}</Text></Text>
-      <Text style={styles.cardLabel}>Viatura: <Text style={styles.cardValue}>{item.viatura}</Text></Text>
-      <Text style={styles.cardLabel}>Horário: <Text style={styles.cardValue}>{item.dataHora}</Text></Text>
-    </TouchableOpacity>
+      // O executeSql adaptado retorna { rows: { _array: [] } }
+      const dados = resultado.rows._array; 
+      
+      console.log("Dados carregados do SQLite:", dados); // OLHE NO SEU TERMINAL/LOG
+      setListaOcorrencias(dados);
+
+    } catch (error) {
+      console.error("Erro ao buscar ocorrências:", error);
+      Alert.alert("Erro", "Falha ao carregar histórico.");
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  // --- USE FOCUS EFFECT ---
+  // Isso faz a lista recarregar toda vez que você entra nessa tela
+  useFocusEffect(
+    useCallback(() => {
+      carregarDados();
+    }, [])
   );
 
-  // --- Render Item: Ocorrência HISTÓRICO (Grid Vertical) ---
-  const renderHistoryItem: ListRenderItem<Ocorrencia> = ({ item }) => (
+  // Lógica de Filtragem (Visual)
+  const dadosFiltrados = listaOcorrencias.filter(item => {
+    if (filtroSelecionado === 'Todos') return true;
+    if (filtroSelecionado === 'Rascunho') return item.status === 'EM_DESLOCAMENTO' || item.status === 'RASCUNHO';
+    if (filtroSelecionado === 'Finalizado') return item.status === 'FINALIZADO';
+    return true;
+  });
+
+  // --- Render Item: Ocorrência (Grid Vertical) ---
+  const renderHistoryItem: ListRenderItem<OcorrenciaBD> = ({ item }) => (
     <TouchableOpacity 
       style={styles.card}
       activeOpacity={0.7}
-      // NAVEGAÇÃO AO CLICAR NO CARD DO HISTÓRICO
       onPress={() => navigation.navigate('DetalhesOcorrencia', { 
-        idOcorrencia: item.codigo,
+        idOcorrencia: item.numero_ocorrencia || `ID-${item.id}`,
+        dbId: item.id, // Passa o ID real para permitir edição
         dadosIniciais: {
-          natureza: item.natureza,
-          horaDespacho: item.dataHora,
-          status: item.status,
-          viatura: item.viatura
+          viatura: `${item.tipo_viatura}-${item.numero_viatura}`,
+          horaDespacho: `${item.data_acionamento || ''} ${item.hora_acionamento || ''}`,
+          status: item.status
         }
       })}
     >
       <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center'}}>
-         <Text style={styles.cardTitle}>{item.codigo}</Text>
+         <Text style={styles.cardTitle}>{item.numero_ocorrencia || `ID: ${item.id}`}</Text>
       </View>
       
       <View style={{marginVertical: 4}}>
-        <Text style={styles.cardLabel}>Data/hora: <Text style={styles.cardValue}>{item.dataHora}</Text></Text>
-        <Text style={styles.cardLabel}>Viatura: <Text style={styles.cardValue}>{item.viatura}</Text></Text>
+        <Text style={styles.cardLabel}>Data: <Text style={styles.cardValue}>{item.data_acionamento}</Text></Text>
+        <Text style={styles.cardLabel}>Vtr: <Text style={styles.cardValue}>{item.tipo_viatura}-{item.numero_viatura}</Text></Text>
       </View>
 
       <Text style={[
         styles.statusText, 
-        item.status === 'Pendente' ? { color: '#F57C00' } : { color: '#2E7D32' }
+        item.status === 'FINALIZADO' ? { color: '#2E7D32' } : { color: '#F57C00' }
       ]}>
-        Status: {item.status}
+        {item.status?.replace('_', ' ')}
       </Text>
     </TouchableOpacity>
   );
 
-  // --- Componente de Cabeçalho (Filtros + Lista Horizontal) ---
-  // Isso rola junto com a lista principal
+  // --- Componente de Cabeçalho ---
   const HeaderComponent = () => (
     <View>
-      {/* 1. Área de Filtros (Scroll Horizontal) */}
+      {/* Filtros */}
       <View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersScroll}>
           <TouchableOpacity 
             style={[styles.filterChip, filtroSelecionado === 'Todos' && styles.filterChipSelected]}
             onPress={() => setFiltroSelecionado('Todos')}
           >
-            <View style={[styles.radioCircle, filtroSelecionado === 'Todos' && { borderColor: '#B71C1C' }]}>
-               {filtroSelecionado === 'Todos' && <View style={styles.radioInnerCircle} />}
-            </View>
-            <Text style={[styles.filterText, filtroSelecionado === 'Todos' && styles.filterTextSelected]}>Todas</Text>
+             <Text style={[styles.filterText, filtroSelecionado === 'Todos' && styles.filterTextSelected]}>Todas</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.filterChip, filtroSelecionado === 'Pendente' && styles.filterChipSelected]}
-            onPress={() => setFiltroSelecionado('Pendente')}
+            style={[styles.filterChip, filtroSelecionado === 'Rascunho' && styles.filterChipSelected]}
+            onPress={() => setFiltroSelecionado('Rascunho')}
           >
-            <View style={[styles.radioCircle, filtroSelecionado === 'Pendente' && { borderColor: '#B71C1C' }]}>
-               {filtroSelecionado === 'Pendente' && <View style={styles.radioInnerCircle} />}
-            </View>
-            <Text style={[styles.filterText, filtroSelecionado === 'Pendente' && styles.filterTextSelected]}>Não Lidas</Text>
+            <Text style={[styles.filterText, filtroSelecionado === 'Rascunho' && styles.filterTextSelected]}>Em Andamento</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.filterChip, filtroSelecionado === 'Concluidas' && styles.filterChipSelected]}
-            onPress={() => setFiltroSelecionado('Concluidas')} // Ajuste conforme seu tipo
+            style={[styles.filterChip, filtroSelecionado === 'Finalizado' && styles.filterChipSelected]}
+            onPress={() => setFiltroSelecionado('Finalizado')}
           >
-             <View style={[styles.radioCircle, filtroSelecionado === 'Concluidas' && { borderColor: '#B71C1C' }]}>
-               {filtroSelecionado === 'Concluidas' && <View style={styles.radioInnerCircle} />}
-            </View>
-            <Text style={[styles.filterText, filtroSelecionado === 'Concluidas' && styles.filterTextSelected]}>Tarefas</Text>
+            <Text style={[styles.filterText, filtroSelecionado === 'Finalizado' && styles.filterTextSelected]}>Finalizadas</Text>
           </TouchableOpacity>
         </ScrollView>
-      </View>
-
-      {/* 2. Seção: Em Andamento / Ativas */}
-      <View style={styles.sectionContainer}>
-        <Text style={styles.sectionTitle}>⚠️ Em Andamento</Text>
-        <FlatList 
-          data={ATIVAS_MOCK}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          renderItem={renderActiveItem}
-          keyExtractor={item => item.id}
-          contentContainerStyle={{ paddingBottom: 10, paddingRight: 16 }}
-        />
-      </View>
-
-      {/* 3. Título do Histórico */}
-      <View style={styles.historyHeader}>
-         {/* Espaço opcional para outro título se desejar */}
       </View>
     </View>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header Fixo (Título da Pagina) */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Feather name="chevron-left" size={28} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Ocorrências</Text>
+        <Text style={styles.headerTitle}>Histórico Real (SQLite)</Text>
         <View style={{ width: 32 }} /> 
       </View>
 
-      {/* Lista Principal (Histórico) */}
       <FlatList
         data={dadosFiltrados}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => String(item.id)}
         renderItem={renderHistoryItem}
         numColumns={2}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.listContent}
-        ListHeaderComponent={HeaderComponent} // Renderiza os filtros e a lista horizontal antes
+        ListHeaderComponent={HeaderComponent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <Text style={{textAlign: 'center', marginTop: 20, color: '#999'}}>
-            Nenhuma ocorrência encontrada.
-          </Text>
+          <View style={{padding: 20, alignItems: 'center'}}>
+            <Text style={{color: '#999', textAlign: 'center'}}>
+              {carregando ? 'Carregando dados...' : 'Nenhuma ocorrência salva no celular.'}
+            </Text>
+            {!carregando && (
+              <Text style={{fontSize: 12, color: '#bbb', marginTop: 10}}>
+                Crie uma nova ocorrência para testar o banco de dados.
+              </Text>
+            )}
+          </View>
         }
       />
     </SafeAreaView>

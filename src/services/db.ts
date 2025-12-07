@@ -1,13 +1,11 @@
 import * as SQLite from 'expo-sqlite';
 
-// Variável para segurar a conexão com o banco
 let db: SQLite.SQLiteDatabase | null = null;
 
-// Função auxiliar para abrir o banco (Singleton)
 const getDB = async () => {
   if (!db) {
-    // Abre o banco usando a NOVA API Assíncrona
-    db = await SQLite.openDatabaseAsync('guardiao360_v2.db');
+    // MUDANÇA 1: Alterei para v3 para forçar a recriação das tabelas
+    db = await SQLite.openDatabaseAsync('guardiao360_v3.db');
   }
   return db;
 };
@@ -15,7 +13,6 @@ const getDB = async () => {
 export const initDB = async () => {
   const database = await getDB();
 
-  // Na nova API, usamos execAsync para criar tabelas (pode rodar vários comandos de uma vez)
   try {
     await database.execAsync(`
       PRAGMA journal_mode = WAL;
@@ -86,7 +83,10 @@ export const initDB = async () => {
         nome_hospital TEXT,
         sofreu_acidente_transito TEXT,
         condicao_seguranca TEXT,
+        
         assinatura_path TEXT,
+        status_assinatura TEXT, -- MUDANÇA 2: Nova coluna adicionada
+        
         FOREIGN KEY (ocorrencia_id) REFERENCES ocorrencias(id)
       );
 
@@ -100,24 +100,19 @@ export const initDB = async () => {
         FOREIGN KEY (ocorrencia_id) REFERENCES ocorrencias(id)
       );
     `);
-    console.log('Tabelas inicializadas com sucesso (Nova API)');
+    console.log('Banco de Dados V3 (com status assinatura) inicializado!');
   } catch (error) {
     console.error('Erro ao inicializar tabelas:', error);
     throw error;
   }
 };
 
-// Função "Adaptadora"
-// Ela usa a nova API (runAsync/getAllAsync) mas devolve os dados no formato que suas telas esperam.
 export const executeSql = async (sql: string, params: any[] = []) => {
   const database = await getDB();
-  
-  // Verifica se é um comando de LEITURA (SELECT) ou ESCRITA (INSERT/UPDATE)
   const isSelect = sql.trim().toUpperCase().startsWith('SELECT');
 
   try {
     if (isSelect) {
-      // Se for SELECT, usamos getAllAsync
       const rows = await database.getAllAsync(sql, params);
       return { 
         rows: { 
@@ -127,11 +122,10 @@ export const executeSql = async (sql: string, params: any[] = []) => {
         } 
       };
     } else {
-      // Se for INSERT/UPDATE/DELETE, usamos runAsync
       const result = await database.runAsync(sql, params);
       return {
-        insertId: result.lastInsertRowId, // Adaptando o nome novo para o antigo
-        rowsAffected: result.changes      // Adaptando o nome novo para o antigo
+        insertId: result.lastInsertRowId,
+        rowsAffected: result.changes
       };
     }
   } catch (error) {

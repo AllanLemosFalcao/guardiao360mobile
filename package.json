@@ -16,6 +16,8 @@
     "axios": "^1.13.2",
     "expo": "~54.0.27",
     "expo-crypto": "~15.0.8",
+    "expo-image-picker": "~17.0.9",
+    "expo-location": "~19.0.8",
     "expo-sqlite": "~16.0.10",
     "expo-status-bar": "~3.0.9",
     "react": "19.1.0",
@@ -25,7 +27,7 @@
     "react-native-screens": "~4.16.0",
     "react-native-signature-canvas": "^5.0.1",
     "react-native-web": "^0.21.0",
-    "react-native-webview": "^13.16.0"
+    "react-native-webview": "13.15.0"
   },
   "private": true,
   "devDependencies": {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -6,96 +6,48 @@ import {
   TouchableOpacity, 
   SafeAreaView, 
   ScrollView, 
-  Alert
+  Alert,
+  Modal,
+  Image
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import { styles } from './RelatorioFinalScreen.styles';
 import { RootStackParamList } from '../../App';
-
-// Importa a função de banco de dados
+import SignatureScreen from 'react-native-signature-canvas';
 import { executeSql } from '../services/db';
 
 type RelatorioFinalRouteProp = RouteProp<RootStackParamList, 'RelatorioFinal'>;
 
-// --- LISTAS DE DADOS (Mantidas as mesmas) ---
+// --- LISTAS DE DADOS ---
 const LISTA_NATUREZA = ['APH', 'Atividade Comunitária', 'Incêndio', 'Prevenção', 'Produtos Perigosos', 'Salvamento'];
-const LISTA_GRUPO = [
-  'Acidente de Trânsito Atropelamento', 'Acidente de Transito Capotamento', 'Acidente de Transito Choque', 
-  'Acidente de transito colisão abalroamento', 'Acidentes diversos', 'APH Diversos', 'Apoio em operações', 
-  'Apoio social', 'Atividade comunitária diversa', 'Derramamento', 'Diversos', 'Emergência cardíaca', 
-  'Emergencia clinicas diversas', 'Evento com Animal', 'Evento com Árvore', 'Evento com meio de transporte', 
-  'Evento com pessoa', 'Evento esportivo', 'Evento festivo', 'Explosão', 'Incendio', 'Incendio em área de descarte', 
-  'Incendio em edificação comercial', 'Incendio em edificação concentração de publico', 'Incendio em edificação depósito', 
-  'Incêndio em edificação escolar', 'Inciencio em edificação especial', 'Incêndio em edificação hospitalar', 
-  'Incêndio em edificação industrial', 'Incêndio em edificação outros', 'Incendio em edificação residencial', 
-  'Incêndio em edificação transitória', 'Incendio em meio de transporte terrestre', 'Incêndio em vegetação', 
-  'Incêndio em via publica', 'Incêndios diversos', 'Interação educativa', 'Prevenção aquática', 'Prevenção diversos', 
-  'Queda', 'Queimadura elétrica/choque', 'Salvamento diverso', 'Trauma por objeto contundente', 
-  'Trauma por objeto perfuro cortante', 'Trem de socorro', 'Vazamento', 'Vítima de agressão'
-];
-const LISTA_SUBGRUPO = [
-  'Abastecimento de Água', 'Açougue, Frigorífico, Matadouro ou Similar', 'Afogamento', 'Agência Bancária', 
-  'Agência de Câmbio ou Similar', 'Aglomerado Subnormal Favela', 'Alimentícia', 'Apoio à Instituição', 
-  'Arborização Pública', 'Arma de Fogo', 'Armazém, Galpão ou Similar', 'Ativa e Reativa (Orientação ao Banhista)', 
-  'Ativação de Posto com Embarcação', 'Ativação de Posto com Viatura', 'Auto Passeio', 'Auto Passeio x Auto Passeio', 
-  'Auto Passeio x Bicicleta', 'Auto Passeio x Motocicleta', 'Banho de Neblina', 'Bar, Lanchonete ou Similar', 
-  'Barbearia, Salão de Beleza ou Similar', 'Bicicleta', 'Borracha, Pneu ou Similar', 'Caatinga', 'Caminhão', 
-  'Canino Cão', 'Canteiro de Obras', 'Carnavalesco', 'Carroça', 'Cinema', 'Coletivo Pensionato', 
-  'Composição de Comboios de Veículos', 'Convulsão', 'Copiadora, Reprografia ou Similar', 'Creche', 
-  'Crise Hipertensiva', 'Desfile Cívico-Militar', 'Desmaio /Síncope', 'Destilaria, Refinaria ou Similar', 
-  'Diverso', 'Diversos', 'Eletrodoméstico ou Similar', 'Engasgo', 'Ensino Fundamental ou Médio', 'Ensino Superior', 
-  'Equino', 'Escritório', 'Estação de Tratamento ou Distribuição de Água', 'Estação ou Subestação de Distribuição de Energia Elétrica', 
-  'Estacionamento, Garagem ou Similar', 'Estádio de Futebol', 'Exercício Simulado', 'Exposição', 
-  'Fábrica ou Revenda de Fogos de Artifício ou Artefato Explosivo', 'Farmácia, Perfumaria ou Similar', 'Felino Gato', 
-  'Fiação Elétrica de Poste', 'Fios Energizados de Postes', 'Galeria', 'Gás Liquefeito de Petróleo', 
-  'Gás Natural / Gás Natural Veicular', 'Gases', 'Hospital', 'Hotel ou Apart Hotel', 'Igreja, Templo ou Similar', 
-  'Inseto Abelha', 'Jardim', 'Junino', 'Laboratório', 'Lavagem de Pista', 'Líquidos Inflamáveis', 'Líquidos não Inflamáveis', 
-  'Lixão', 'Local Especial para Tratamento e Reciclagem', 'Loja de Departamentos', 'Madeira, Móveis ou Similar', 
-  'Madeireira', 'Mangue', 'Máquina Agrícola', 'Mata ou Floresta Nativa', 'Mato', 'Mercado', 'Metal Qualquer', 
-  'Metalúrgica', 'Metrô', 'Monturo', 'Moto', 'Motocicleta', 'Motocicleta x Motocicleta', 
-  'Motocicleta x Ônibus ou Micro-Ônibus', 'Motocicleta x Veículo de Carga Perigosa', 'Multifamiliar Casas Conjugadas', 
-  'Multifamiliar Edificação Elevada', 'Não Identificado', 'Oficina', 'Ônibus ou Micro-Ônibus', 'Outro', 'Outros Gases', 
-  'Padaria ou Similar', 'Palestra', 'Papel, Livros ou Similar', 'Parada Cardiorrespiratória', 
-  'Pessoa em Local de Difícil Acesso (Trilha/Montanha/Caverna)', 'Plástico ou Similar', 'Policlínica, Clínica ou Similar', 
-  'Pousada', 'Pouso e Decolagem', 'Prédio Público', 'Prevenção em Instrução', 'Prevenção em Orla Marítima', 
-  'Problemas Cardíacos', 'Protesto', 'Quartel Da Polícia, Bombeiro, Forças Armadas ou Afim', 'Queda', 
-  'Queda da Própria Altura', 'Queda de Árvore em Via Pública', 'Queda de Árvore sobre Imóveis', 'Queda de Moto', 
-  'Queda de Nível Abaixo de 2M', 'Queda de Nível Acima de 2M', 'Química', 'Resgate Aquático', 'Restaurante', 
-  'Retirada de Anel ou Similar', 'Reunião de Público', 'Semana Santa', 'Substâncias Explosivas', 'Substâncias Tóxicas', 
-  'Supermercado', 'Táxi', 'Tentativa de Suicídio', 'Terreno Baldio, Lote Vago ou Similar', 'Têxtil', 
-  'Transporte de bem ou Produto', 'Transporte de Vítima', 'Unifamiliar Casa Residência', 'Van ou Similar', 
-  'Veículo de Carga Não Perigosa', 'Veículo de Carga Perigosa'
-];
+const LISTA_GRUPO = ['Acidente de Trânsito', 'APH Diversos', 'Incêndio em edificação', 'Salvamento diverso', 'Outros', 'Evento com Animal', 'Explosão', 'Vazamento', 'Queda', 'Trauma'];
+const LISTA_SUBGRUPO = ['Colisão', 'Capotamento', 'Mal súbito', 'Queda de nível', 'Ferimento por arma', 'Queimadura', 'Afogamento', 'Outros'];
 const LISTA_SITUACAO = ['Atendida', 'Não Atendida'];
 const LISTA_NAO_ATENDIDA = ['Cancelada', 'Sem atuação/Motivo', 'Trote'];
 const LISTA_SEM_ATUACAO = ['Não se aplica', 'Recusou atendimento', 'Situação já solucionada', 'Vítima socorrida pelo SAMU', 'Vítima socorrida por populares', 'Outro'];
-const LISTA_DESTINO = ['Encaminhada ao suporte avançado', 'Encaminhado ao suporte aeromédico', 'Encaminhado ao suporte básico', 'Entregue ao Hospital', 'Permaneceu no local após atendimento', 'Recusou atendimento'];
-const LISTA_HOSPITAIS = ['Hospital da restauração', 'Hospital Hapvida', 'Hospital Metropolitano Sul - Dom Helder Câmara', 'Hospital Real Português', 'Hospital São Lucas', 'UPA Barra de Jangada - Senador Wilson Campos', 'UPA Ibura - Pediatra Zilda Arns', 'UPA Imbiribeira - Maria Esther Souto Carvalho', 'Outro'];
+const LISTA_DESTINO = ['Encaminhada ao suporte avançado', 'Encaminhado ao suporte básico', 'Entregue ao Hospital', 'Recusou atendimento', 'Permaneceu no local'];
+const LISTA_HOSPITAIS = ['Hospital da Restauração', 'Hospital Getúlio Vargas', 'UPA', 'Outro'];
 
-// --- COMPONENTE: INPUT COM SUGESTÃO ---
+const LISTA_STATUS_ASSINATURA = [
+  'Assinatura Coletada', 
+  'Vítima Recusou-se a Assinar', 
+  'Vítima Impossibilitada (Inconsciente/Trauma)', 
+  'Vítima Evadiu-se do Local'
+];
+
+// --- COMPONENTES AUXILIARES ---
 const InputComSugestao = ({ label, value, setValue, listaOpcoes, placeholder, zIndexVal = 1 }: any) => {
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
   const sugestoesFiltradas = listaOpcoes.filter((item: string) => item.toUpperCase().includes(value.toUpperCase()));
-
   return (
     <View style={[styles.inputGroup, { zIndex: mostrarSugestoes ? 100 : zIndexVal }]}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput 
-        style={styles.input}
-        value={value}
-        onChangeText={(text) => { setValue(text); setMostrarSugestoes(true); }}
-        onFocus={() => setMostrarSugestoes(true)}
-        onBlur={() => setTimeout(() => setMostrarSugestoes(false), 200)}
-        placeholder={placeholder}
-      />
+      <TextInput style={styles.input} value={value} onChangeText={(t) => {setValue(t); setMostrarSugestoes(true)}} onFocus={() => setMostrarSugestoes(true)} onBlur={() => setTimeout(() => setMostrarSugestoes(false), 200)} placeholder={placeholder} />
       {mostrarSugestoes && sugestoesFiltradas.length > 0 && (
         <View style={styles.suggestionsBox}>
-          {sugestoesFiltradas.slice(0, 50).map((item: string, index: number) => (
-            <TouchableOpacity 
-              key={index} style={styles.suggestionItem}
-              onPress={() => { setValue(item); setMostrarSugestoes(false); }}
-            >
+          {sugestoesFiltradas.slice(0, 50).map((item, index) => (
+            <TouchableOpacity key={index} style={styles.suggestionItem} onPress={() => {setValue(item); setMostrarSugestoes(false)}}>
               <Text style={styles.suggestionText}>{item}</Text>
             </TouchableOpacity>
           ))}
@@ -110,11 +62,7 @@ const RadioGroup = ({ label, opcoes, selecionado, setSelecionado }: any) => (
     <Text style={styles.label}>{label}</Text>
     <View style={styles.radioContainer}>
       {opcoes.map((op: string) => (
-        <TouchableOpacity
-          key={op}
-          style={[styles.radioButton, selecionado === op && styles.radioButtonSelected]}
-          onPress={() => setSelecionado(op)}
-        >
+        <TouchableOpacity key={op} style={[styles.radioButton, selecionado === op && styles.radioButtonSelected]} onPress={() => setSelecionado(op)}>
           <Text style={[styles.radioText, selecionado === op && styles.radioTextSelected]}>{op}</Text>
         </TouchableOpacity>
       ))}
@@ -123,27 +71,22 @@ const RadioGroup = ({ label, opcoes, selecionado, setSelecionado }: any) => (
 );
 
 export default function RelatorioFinalScreen() {
-  const navigation = useNavigation<any>(); // Usando 'any' para facilitar reset
+  const navigation = useNavigation<any>();
   const route = useRoute<RelatorioFinalRouteProp>();
-  
-  // Recebe ID do Banco
   const { dbId } = route.params || { dbId: 0 };
   
-  // --- ESTADOS: CLASSIFICAÇÃO ---
+  // Estados Gerais
   const [natureza, setNatureza] = useState('');
   const [grupo, setGrupo] = useState('');
   const [subgrupo, setSubgrupo] = useState('');
-  
   const [situacao, setSituacao] = useState('Atendida');
   const [motivoNaoAtendida, setMotivoNaoAtendida] = useState('');
   const [detalheSemAtuacao, setDetalheSemAtuacao] = useState('');
-  
-  const [horaSaidaLocal, setHoraSaidaLocal] = useState(new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}));
-  
-  // --- ESTADOS: HISTÓRICO (IMPORTANTE) ---
   const [historico, setHistorico] = useState('');
+  const [horaSaidaLocal, setHoraSaidaLocal] = useState(new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}));
+  const [chefeGuarnicao, setChefeGuarnicao] = useState('');
 
-  // --- ESTADOS: VÍTIMA ---
+  // Estados Vítima
   const [vitimaEnvolvida, setVitimaEnvolvida] = useState('Não');
   const [nomeVitima, setNomeVitima] = useState('');
   const [sexoVitima, setSexoVitima] = useState('');
@@ -157,198 +100,198 @@ export default function RelatorioFinalScreen() {
   const [etnia, setEtnia] = useState('');
   const [lgbt, setLgbt] = useState('');
 
-  // --- ESTADOS: CHEFIA ---
-  const [chefeGuarnicao, setChefeGuarnicao] = useState('');
+  // Estado Assinatura
+  const [statusAssinatura, setStatusAssinatura] = useState('Assinatura Coletada');
+  const [assinaturaBase64, setAssinaturaBase64] = useState<string | null>(null);
+  const [modalAssinaturaVisivel, setModalAssinaturaVisivel] = useState(false);
+  const refAssinatura = useRef<any>(null);
   const [salvando, setSalvando] = useState(false);
 
-  // --- FUNÇÃO FINALIZAR ---
+  const handleSignatureOK = (signature: string) => {
+    setAssinaturaBase64(signature);
+    setModalAssinaturaVisivel(false);
+  };
+  const handleSignatureEmpty = () => Alert.alert('Atenção', 'Assine antes de confirmar.');
+  const handleClearSignature = () => refAssinatura.current.clearSignature();
+
+  // --- CORREÇÃO DA FUNÇÃO HANDLEFINALIZAR ---
   const handleFinalizar = async () => {
-    if (!dbId) {
-      Alert.alert("Erro", "Ocorrência não encontrada no banco.");
-      return;
-    }
+    // Validações básicas
+    if (!dbId) { Alert.alert("Erro", "Ocorrência não encontrada."); return; }
+    if (!natureza || !grupo || !chefeGuarnicao) { Alert.alert("Campos Obrigatórios", "Preencha Natureza, Grupo e Chefe."); return; }
 
-    if (!natureza || !grupo || !chefeGuarnicao) {
-      Alert.alert("Campos Obrigatórios", "Preencha Natureza, Grupo e Chefe da Guarnição.");
-      return;
-    }
+    // O Alert.alert deve ficar fora de qualquer IF para funcionar sempre
+    Alert.alert("Confirmar Envio", "Confirma o fechamento desta ocorrência?", [
+      { text: "Cancelar", style: "cancel" },
+      { 
+        text: "FINALIZAR", 
+        onPress: async () => {
+          setSalvando(true);
+          try {
+            // Lógica do histórico (adiciona recusa se necessário)
+            let historicoFinal = historico;
+            if (vitimaEnvolvida === 'Sim' && statusAssinatura !== 'Assinatura Coletada') {
+              historicoFinal += `\n[OBS: ${statusAssinatura.toUpperCase()}]`;
+            }
 
-    Alert.alert(
-      "Confirmar Envio",
-      "Confirma o fechamento desta ocorrência? Os dados serão salvos localmente.",
-      [
-        { text: "Revisar", style: "cancel" },
-        { 
-          text: "FINALIZAR AGORA", 
-          onPress: async () => {
-            setSalvando(true);
-            try {
-              // 1. UPDATE na Ocorrência (Status = FINALIZADO)
+            // 1. Atualiza a Ocorrência
+            await executeSql(
+              `UPDATE ocorrencias SET 
+                natureza_final = ?, grupo = ?, subgrupo = ?, situacao_ocorrencia = ?,
+                motivo_nao_atendida = ?, detalhe_sem_atuacao = ?, historico_final = ?,
+                chefe_guarnicao = ?, hora_saida_local = ?, status = 'FINALIZADO'
+               WHERE id = ?;`,
+              [natureza, grupo, subgrupo, situacao, motivoNaoAtendida, detalheSemAtuacao, historicoFinal, chefeGuarnicao, horaSaidaLocal, dbId]
+            );
+
+            // 2. Insere a Vítima (apenas se houver)
+            if (vitimaEnvolvida === 'Sim') {
+              // Prepara a assinatura (só salva se foi coletada)
+              const assinaturaParaSalvar = (statusAssinatura === 'Assinatura Coletada') ? assinaturaBase64 : null;
+              
               await executeSql(
-                `UPDATE ocorrencias SET 
-                  natureza_final = ?,
-                  grupo = ?,
-                  subgrupo = ?,
-                  situacao_ocorrencia = ?,
-                  motivo_nao_atendida = ?,
-                  detalhe_sem_atuacao = ?,
-                  historico_final = ?,
-                  chefe_guarnicao = ?,
-                  hora_saida_local = ?,
-                  status = 'FINALIZADO'
-                 WHERE id = ?;`,
+                `INSERT INTO vitimas (
+                  ocorrencia_id, nome, sexo, idade, classificacao, 
+                  etnia, lgbt, destino, tipo_hospital, nome_hospital, 
+                  sofreu_acidente_transito, condicao_seguranca, assinatura_path, status_assinatura
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
                 [
-                  natureza, grupo, subgrupo, situacao, 
-                  motivoNaoAtendida, detalheSemAtuacao, 
-                  historico, chefeGuarnicao, horaSaidaLocal,
-                  dbId
+                  dbId, nomeVitima, sexoVitima, idadeVitima, classificacaoVitima,
+                  etnia, lgbt, destinoVitima, tipoHospital, hospitalPublico,
+                  sofreuAcidente, segurancaVitima, assinaturaParaSalvar, statusAssinatura
                 ]
               );
-
-              // 2. INSERT na Tabela de Vítimas (Se houver)
-              if (vitimaEnvolvida === 'Sim') {
-                await executeSql(
-                  `INSERT INTO vitimas (
-                    ocorrencia_id, nome, sexo, idade, classificacao, 
-                    etnia, lgbt, destino, tipo_hospital, nome_hospital, 
-                    sofreu_acidente_transito, condicao_seguranca
-                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-                  [
-                    dbId, nomeVitima, sexoVitima, idadeVitima, classificacaoVitima,
-                    etnia, lgbt, destinoVitima, tipoHospital, hospitalPublico,
-                    sofreuAcidente, segurancaVitima
-                  ]
-                );
-              }
-
-              Alert.alert("Sucesso", "Ocorrência finalizada e salva no banco local!");
-              
-              // Reseta a navegação voltando para a Home
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'MainTabs' }],
-              });
-
-            } catch (error) {
-              console.error(error);
-              Alert.alert("Erro", "Falha ao salvar relatório final.");
-            } finally {
-              setSalvando(false);
             }
+            Alert.alert("Sucesso", "Ocorrência finalizada!");
+            navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+          } catch (error) {
+            console.error(error);
+            Alert.alert("Erro", "Falha ao salvar.");
+          } finally {
+            setSalvando(false);
           }
         }
-      ]
-    );
+      }
+    ]);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Feather name="arrow-left" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Relatório Final (Etapa 4)</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}><Feather name="arrow-left" size={24} color="#333" /></TouchableOpacity>
+        <Text style={styles.headerTitle}>Relatório Final</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         
-        {/* === SEÇÃO 1: CLASSIFICAÇÃO === */}
+        {/* SEÇÕES 1, 2, 3 */}
         <View style={[styles.sectionCard, { zIndex: 30 }]}>
-          <Text style={styles.sectionTitle}>1. Classificação da Ocorrência</Text>
+          <Text style={styles.sectionTitle}>1. Classificação</Text>
           <InputComSugestao label="Natureza" value={natureza} setValue={setNatureza} listaOpcoes={LISTA_NATUREZA} placeholder="Selecione..." zIndexVal={30} />
           <InputComSugestao label="Grupo" value={grupo} setValue={setGrupo} listaOpcoes={LISTA_GRUPO} placeholder="Selecione..." zIndexVal={29} />
           <InputComSugestao label="Subgrupo" value={subgrupo} setValue={setSubgrupo} listaOpcoes={LISTA_SUBGRUPO} placeholder="Selecione..." zIndexVal={28} />
         </View>
 
-        {/* === SEÇÃO 2: HISTÓRICO (Adicionado Text Area) === */}
-        <View style={[styles.sectionCard, { zIndex: 25 }]}>
-          <Text style={styles.sectionTitle}>2. Histórico (Resumo)</Text>
-          <TextInput 
-            style={[styles.input, { height: 100, textAlignVertical: 'top' }]} 
-            multiline={true}
-            numberOfLines={4}
-            placeholder="Descreva o que aconteceu..."
-            value={historico}
-            onChangeText={setHistorico}
-          />
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>2. Histórico</Text>
+          <TextInput style={[styles.input, { height: 100, textAlignVertical: 'top' }]} multiline numberOfLines={4} value={historico} onChangeText={setHistorico} placeholder="Descreva o ocorrido..." />
         </View>
 
-        {/* === SEÇÃO 3: SITUAÇÃO === */}
         <View style={[styles.sectionCard, { zIndex: 20 }]}>
-          <Text style={styles.sectionTitle}>3. Situação do Atendimento</Text>
-          <RadioGroup label="Situação da Ocorrência" opcoes={LISTA_SITUACAO} selecionado={situacao} setSelecionado={setSituacao} />
-          
-          {situacao === 'Não Atendida' && (
-            <RadioGroup label="Motivo Não Atendida" opcoes={LISTA_NAO_ATENDIDA} selecionado={motivoNaoAtendida} setSelecionado={setMotivoNaoAtendida} />
-          )}
-          {motivoNaoAtendida === 'Sem atuação/Motivo' && (
-            <InputComSugestao label="Detalhe Sem Atuação" value={detalheSemAtuacao} setValue={setDetalheSemAtuacao} listaOpcoes={LISTA_SEM_ATUACAO} placeholder="Selecione..." zIndexVal={20} />
-          )}
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Horário de Saída do Local</Text>
-            <TextInput style={styles.input} value={horaSaidaLocal} onChangeText={setHoraSaidaLocal} keyboardType="numbers-and-punctuation" />
-          </View>
+          <Text style={styles.sectionTitle}>3. Situação</Text>
+          <RadioGroup label="Situação" opcoes={LISTA_SITUACAO} selecionado={situacao} setSelecionado={setSituacao} />
+          {situacao === 'Não Atendida' && <RadioGroup label="Motivo" opcoes={LISTA_NAO_ATENDIDA} selecionado={motivoNaoAtendida} setSelecionado={setMotivoNaoAtendida} />}
+          {motivoNaoAtendida === 'Sem atuação/Motivo' && <InputComSugestao label="Detalhe" value={detalheSemAtuacao} setValue={setDetalheSemAtuacao} listaOpcoes={LISTA_SEM_ATUACAO} placeholder="Selecione..." zIndexVal={20} />}
+          <View style={styles.inputGroup}><Text style={styles.label}>Saída do Local</Text><TextInput style={styles.input} value={horaSaidaLocal} onChangeText={setHoraSaidaLocal} /></View>
         </View>
 
-        {/* === SEÇÃO 4: VÍTIMA === */}
+        {/* SEÇÃO 4: VÍTIMA E ASSINATURA */}
         <View style={[styles.sectionCard, { zIndex: 10 }]}>
           <Text style={styles.sectionTitle}>4. Dados da Vítima</Text>
           <RadioGroup label="Vítima Envolvida?" opcoes={['Sim', 'Não']} selecionado={vitimaEnvolvida} setSelecionado={setVitimaEnvolvida} />
 
           {vitimaEnvolvida === 'Sim' && (
             <>
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Nome da Vítima</Text>
-                <TextInput style={styles.input} value={nomeVitima} onChangeText={setNomeVitima} />
-              </View>
-              <RadioGroup label="Sexo" opcoes={['M', 'F', 'Não identificado']} selecionado={sexoVitima} setSelecionado={setSexoVitima} />
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Idade</Text>
-                <TextInput style={styles.input} value={idadeVitima} onChangeText={setIdadeVitima} keyboardType="numeric" />
-              </View>
-              <RadioGroup label="Classificação" opcoes={['Fatal', 'Ferida', 'Ilesa']} selecionado={classificacaoVitima} setSelecionado={setClassificacaoVitima} />
-              <RadioGroup label="Etnia" opcoes={['Branca', 'Negra', 'Parda']} selecionado={etnia} setSelecionado={setEtnia} />
-              <RadioGroup label="Identifica-se LGBTQIA+?" opcoes={['Sim', 'Não', 'Prefere não responder']} selecionado={lgbt} setSelecionado={setLgbt} />
-
-              <InputComSugestao label="Destino da Vítima" value={destinoVitima} setValue={setDestinoVitima} listaOpcoes={LISTA_DESTINO} placeholder="Selecione..." zIndexVal={15} />
+              <View style={styles.inputGroup}><Text style={styles.label}>Nome</Text><TextInput style={styles.input} value={nomeVitima} onChangeText={setNomeVitima} /></View>
+              <RadioGroup label="Sexo" opcoes={['M', 'F']} selecionado={sexoVitima} setSelecionado={setSexoVitima} />
+              <View style={styles.inputGroup}><Text style={styles.label}>Idade</Text><TextInput style={styles.input} value={idadeVitima} onChangeText={setIdadeVitima} keyboardType="numeric" /></View>
+              <InputComSugestao label="Destino" value={destinoVitima} setValue={setDestinoVitima} listaOpcoes={LISTA_DESTINO} placeholder="Selecione..." zIndexVal={15} />
 
               {destinoVitima === 'Entregue ao Hospital' && (
                 <>
                   <RadioGroup label="Tipo de Hospital" opcoes={['Hospital particular', 'Hospital público estadual', 'UPA', 'UPAE']} selecionado={tipoHospital} setSelecionado={setTipoHospital} />
-                  {(['Hospital público estadual', 'UPA', 'UPAE'].includes(tipoHospital)) && (
-                    <InputComSugestao label="Nome do Hospital Público" value={hospitalPublico} setValue={setHospitalPublico} listaOpcoes={LISTA_HOSPITAIS} placeholder="Selecione..." zIndexVal={14} />
-                  )}
+                  {['Hospital público estadual', 'UPA', 'UPAE'].includes(tipoHospital) && <InputComSugestao label="Nome Hospital" value={hospitalPublico} setValue={setHospitalPublico} listaOpcoes={LISTA_HOSPITAIS} placeholder="Selecione..." zIndexVal={14} />}
                 </>
               )}
-              
-              <RadioGroup label="Sofreu acidente de trânsito?" opcoes={['Sim', 'Não']} selecionado={sofreuAcidente} setSelecionado={setSofreuAcidente} />
-              {sofreuAcidente === 'Sim' && (
-                <RadioGroup label="Condição de Segurança" opcoes={['Com airbag', 'Com capacete', 'Com cinto de segurança', 'Sem capacete', 'Não se aplica', 'Outro']} selecionado={segurancaVitima} setSelecionado={setSegurancaVitima} />
-              )}
+
+              {/* ÁREA DE ASSINATURA */}
+              <View style={{ marginTop: 20, borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 10 }}>
+                <Text style={styles.sectionTitle}>Validação da Vítima</Text>
+                
+                <InputComSugestao 
+                  label="Situação da Assinatura" 
+                  value={statusAssinatura} 
+                  setValue={setStatusAssinatura} 
+                  listaOpcoes={LISTA_STATUS_ASSINATURA} 
+                  placeholder="Selecione..." 
+                  zIndexVal={12}
+                />
+
+                {statusAssinatura === 'Assinatura Coletada' && (
+                  <View style={{marginTop: 10}}>
+                    {assinaturaBase64 ? (
+                      <View style={{ alignItems: 'center', marginBottom: 10 }}>
+                        <Image source={{ uri: assinaturaBase64 }} style={{ width: '100%', height: 150, resizeMode: 'contain', backgroundColor: '#fff', borderWidth: 1, borderColor: '#ccc' }} />
+                        <TouchableOpacity onPress={() => setAssinaturaBase64(null)} style={{ marginTop: 10 }}>
+                          <Text style={{ color: 'red', fontWeight: 'bold' }}>Remover Assinatura</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity 
+                        style={{ backgroundColor: '#1976D2', padding: 12, borderRadius: 8, alignItems: 'center' }}
+                        onPress={() => setModalAssinaturaVisivel(true)}
+                      >
+                        <Feather name="pen-tool" size={20} color="#fff" />
+                        <Text style={{ color: '#fff', fontWeight: 'bold', marginTop: 5 }}>COLETAR ASSINATURA</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+              </View>
             </>
           )}
         </View>
 
-        {/* === SEÇÃO 5: RESPONSÁVEL === */}
+        {/* SEÇÃO 5: RESPONSÁVEL */}
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>5. Responsável</Text>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Chefe da Guarnição (Nome/Matrícula)</Text>
-            <TextInput style={styles.input} placeholder="Digite o nome" value={chefeGuarnicao} onChangeText={setChefeGuarnicao} />
+            <Text style={styles.label}>Chefe da Guarnição</Text>
+            <TextInput style={styles.input} value={chefeGuarnicao} onChangeText={setChefeGuarnicao} placeholder="Nome do Responsável" />
           </View>
         </View>
 
-        {/* --- BOTÃO FINAL --- */}
-        <TouchableOpacity 
-          style={[styles.submitButton, salvando && { opacity: 0.7 }]} 
-          onPress={handleFinalizar}
-          disabled={salvando}
-        >
+        <TouchableOpacity style={[styles.submitButton, salvando && { opacity: 0.7 }]} onPress={handleFinalizar} disabled={salvando}>
           <Text style={styles.submitButtonText}>{salvando ? 'ENVIANDO...' : 'ENVIAR RELATÓRIO FINAL'}</Text>
         </TouchableOpacity>
-
       </ScrollView>
+
+      {/* MODAL DE ASSINATURA */}
+      <Modal visible={modalAssinaturaVisivel} animationType="slide" onRequestClose={() => setModalAssinaturaVisivel(false)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+          <View style={{ padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold' }}>Assinar na Tela</Text>
+            <TouchableOpacity onPress={() => setModalAssinaturaVisivel(false)}><Feather name="x" size={24} color="#333" /></TouchableOpacity>
+          </View>
+          <View style={{ flex: 1 }}>
+            <SignatureScreen ref={refAssinatura} onOK={handleSignatureOK} onEmpty={handleSignatureEmpty} descriptionText="Assine acima" clearText="Limpar" confirmText="Confirmar" webStyle={`.m-signature-pad--footer {display: none; margin: 0px;}`} />
+          </View>
+          <View style={{ flexDirection: 'row', padding: 20, justifyContent: 'space-between' }}>
+            <TouchableOpacity onPress={handleClearSignature} style={{ padding: 15, backgroundColor: '#eee', borderRadius: 8, flex: 1, marginRight: 10, alignItems: 'center' }}><Text style={{ fontWeight: 'bold' }}>Limpar</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => refAssinatura.current.readSignature()} style={{ padding: 15, backgroundColor: '#2E7D32', borderRadius: 8, flex: 1, marginLeft: 10, alignItems: 'center' }}><Text style={{ color: '#fff', fontWeight: 'bold' }}>CONFIRMAR</Text></TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
