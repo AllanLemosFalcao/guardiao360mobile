@@ -44,7 +44,7 @@ export const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1976D2',
+    color: '#2E7D32',
     marginBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
@@ -102,7 +102,7 @@ export const styles = StyleSheet.create({
   },
   radioButton: {
     borderWidth: 1,
-    borderColor: '#1976D2',
+    borderColor: '#2E7D32',
     borderRadius: 20,
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -111,10 +111,10 @@ export const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   radioButtonSelected: {
-    backgroundColor: '#1976D2',
+    backgroundColor: '#2E7D32',
   },
   radioText: {
-    color: '#1976D2',
+    color: '#2E7D32',
     fontSize: 13,
     fontWeight: '600',
   },

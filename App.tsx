@@ -1,4 +1,4 @@
-import { React, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { View, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -18,6 +18,7 @@ import DetalhesOcorrenciaScreen from './src/screens/DetalhesOcorrenciaScreen';
 import ChegadaCenaScreen from './src/screens/ChegadaCenaScreen';
 import RelatorioFinalScreen from './src/screens/RelatorioFinalScreen';
 import TimelineScreen from './src/screens/TimelineScreen';
+import QRCodeScannerScreen from './src/screens/QRCodeScannerScreen';
 
 // Banco offiline (SQLite)
 import { initDB } from './src/services/db';
@@ -25,23 +26,17 @@ import { initDB } from './src/services/db';
 // --- TIPAGEM ---
 export type RootStackParamList = {
   Login: undefined;
-  MainTabs: undefined; // O grupo de abas
-  NovaOcorrencia: undefined; // Modal (fora das abas)
-  Ocorrencias: undefined; // Lista (acessada pela Home)
-  // Rota nova para a tela de detalhes inteligente:
-  DetalhesOcorrencia: { 
-    idOcorrencia: string; 
-    dadosIniciais: any; 
-    ChegadaCena: { idOcorrencia: string }; // etapa 2 formulario
-    RelatorioFinal: { idOcorrencia: string };
-    Timeline: { idOcorrencia: string };
-  };
+  MainTabs: undefined; 
+  NovaOcorrencia: { modoEditar?: boolean; dbId?: number; dadosAntigos?: any };
+  Ocorrencias: undefined;
+  QRCodeScanner: undefined;
+  DetalhesOcorrencia: { idOcorrencia: string; dadosIniciais?: any; dbId?: number };
+  ChegadaCena: { idOcorrencia: string; dbId?: number };
+  RelatorioFinal: { idOcorrencia: string; dbId?: number };
+  Timeline: { idOcorrencia: string };
 };
 
-// Stack Principal (Navegação vertical/modais)
 const Stack = createNativeStackNavigator<RootStackParamList>();
-
-// Tab Principal (Barra inferior)
 const Tab = createBottomTabNavigator();
 
 // --- COMPONENTE DA BARRA INFERIOR ---
@@ -104,10 +99,9 @@ function AppTabs() {
       {/* 4. NOVA OCORRÊNCIA (Botão de Ação) */}
       <Tab.Screen 
         name="NovaOcorrenciaTab" 
-        component={View} // Componente vazio, pois vamos interceptar o clique
+        component={View} 
         listeners={({ navigation }) => ({
           tabPress: (e) => {
-            // Previne a abertura da aba vazia e abre o Modal
             e.preventDefault();
             navigation.navigate('NovaOcorrencia');
           },
@@ -137,16 +131,18 @@ function AppTabs() {
 
 // --- APP PRINCIPAL ---
 export default function App() {
-        // --- INICIALIZAÇÃO DO BANCO ---
-        useEffect(() => {
-          initDB()
-            .then(() => {
-              console.log('Banco de Dados Local Inicializado com Sucesso!');
-            })
-            .catch((err) => {
-              console.log('Falha ao criar banco de dados: ', err);
-            });
-        }, []);
+  
+  // Inicializa o Banco
+  useEffect(() => {
+    initDB()
+      .then(() => {
+        console.log('Banco de Dados Local Inicializado com Sucesso!');
+      })
+      .catch((err) => {
+        console.log('Falha ao criar banco de dados: ', err);
+      });
+  }, []);
+
   return (
     <NavigationContainer>
       <StatusBar style="dark" backgroundColor="#ffffff" />
@@ -155,44 +151,46 @@ export default function App() {
         initialRouteName="Login"
         screenOptions={{ headerShown: false }}
       >
-        {/* Tela de Login (Fora das abas) */}
+        {/* Tela de Login */}
         <Stack.Screen name="Login" component={LoginScreen} />
 
-        {/* Telas Principais (Com abas) */}
+        {/* Abas Principais */}
         <Stack.Screen name="MainTabs" component={AppTabs} />
         
-        {/* Modais e outras telas (Sobrepõem as abas) */}
+        {/* Modais e Fluxo de Ocorrência */}
         <Stack.Screen 
           name="NovaOcorrencia" 
           component={NovaOcorrenciaScreen} 
           options={{ presentation: 'modal' }}
         />
-        <Stack.Screen 
-          name="RelatorioFinal" 
-          component={RelatorioFinalScreen}
-          options={{ headerShown: false }} 
-        />
         
-        
-        {/* Tela de Lista de Ocorrências (Histórico) */}
         <Stack.Screen name="Ocorrencias" component={OcorrenciasScreen} />
 
-        {/* NOVA TELA DE DETALHES INTELIGENTE */}
         <Stack.Screen 
           name="DetalhesOcorrencia" 
           component={DetalhesOcorrenciaScreen}
           options={{ 
-            headerShown: true, // Mostra o header padrão se quiser, ou false se usar o customizado da tela
+            headerShown: true, 
             title: 'Atendimento em Andamento',
-            headerBackVisible: false // Impede voltar acidentalmente
+            headerBackVisible: false 
           }} 
         />
-        <Stack.Screen name="Timeline" component={TimelineScreen} />
+
         <Stack.Screen 
           name="ChegadaCena" 
           component={ChegadaCenaScreen}
           options={{ headerShown: false }} 
         />
+
+        <Stack.Screen 
+          name="RelatorioFinal" 
+          component={RelatorioFinalScreen}
+          options={{ headerShown: false }} 
+        />
+
+        <Stack.Screen name="Timeline" component={TimelineScreen} />
+        
+        <Stack.Screen name="QRCodeScanner" component={QRCodeScannerScreen} />
 
       </Stack.Navigator>
     </NavigationContainer>

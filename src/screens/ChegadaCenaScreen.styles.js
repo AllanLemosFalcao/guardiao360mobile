@@ -40,7 +40,7 @@ export const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     borderLeftWidth: 5,
-    borderLeftColor: '#2E7D32', // Verde
+    borderLeftColor: '#1565C0', // Verde
   },
   qtaTitle: {
     fontSize: 16,
@@ -49,7 +49,7 @@ export const styles = StyleSheet.create({
     marginBottom: 10,
   },
   btnCaptura: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#1565C0',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

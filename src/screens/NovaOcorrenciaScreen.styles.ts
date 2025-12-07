@@ -5,6 +5,8 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  
+  // --- Header ---
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -14,6 +16,7 @@ export const styles = StyleSheet.create({
     borderBottomColor: '#eee',
     backgroundColor: '#fff',
     elevation: 2,
+    paddingTop: 50, // Ajuste para StatusBar
   },
   headerTitle: {
     fontSize: 20,
@@ -21,6 +24,7 @@ export const styles = StyleSheet.create({
     color: '#333',
   },
   
+  // --- Conteúdo ---
   content: {
     padding: 20,
     paddingBottom: 100,
@@ -28,7 +32,7 @@ export const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1976D2',
+    color: '#B71C1C',
     marginTop: 10,
     marginBottom: 15,
     borderBottomWidth: 1,
@@ -36,10 +40,55 @@ export const styles = StyleSheet.create({
     paddingBottom: 5,
   },
 
-  // --- Inputs ---
+  // --- NOVO: Estilos do Card de Registro (GPS) ---
+  // Copiados e adaptados da tela de ChegadaCena
+  qtaCard: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 10,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    marginBottom: 20,
+  },
+  qtaTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#555',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+  },
+  btnCaptura: {
+    backgroundColor: '#B71C1C', // Vermelho Bombeiro
+    paddingVertical: 15,
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+  },
+  btnCapturaText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+    marginLeft: 10,
+  },
+  dataContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  dataText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+
+  // --- Inputs Padrão ---
   inputGroup: {
     marginBottom: 15,
-    zIndex: 1, // Importante para o dropdown passar por cima
+    zIndex: 1,
   },
   row: {
     flexDirection: 'row',
@@ -64,10 +113,10 @@ export const styles = StyleSheet.create({
     backgroundColor: '#FAFAFA',
   },
   
-  // --- Lista de Sugestões (Autocomplete) ---
+  // --- Autocomplete ---
   suggestionsBox: {
     position: 'absolute',
-    top: 75, // Ajustar conforme altura do input + label
+    top: 75,
     left: 0,
     right: 0,
     backgroundColor: '#fff',
@@ -88,7 +137,7 @@ export const styles = StyleSheet.create({
     color: '#333',
   },
 
-  // --- Botões de Opção (Radio) ---
+  // --- Radio Buttons (Chips) ---
   radioContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -96,7 +145,7 @@ export const styles = StyleSheet.create({
   },
   radioButton: {
     borderWidth: 1,
-    borderColor: '#1976D2',
+    borderColor: '#B71C1C',
     borderRadius: 20,
     paddingVertical: 6,
     paddingHorizontal: 12,
@@ -104,10 +153,10 @@ export const styles = StyleSheet.create({
     marginBottom: 8,
   },
   radioButtonSelected: {
-    backgroundColor: '#1976D2',
+    backgroundColor: '#B71C1C',
   },
   radioText: {
-    color: '#1976D2',
+    color: '#B71C1C',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -115,7 +164,7 @@ export const styles = StyleSheet.create({
     color: '#fff',
   },
 
-  // --- Botão de Ação ---
+  // --- Footer ---
   footer: {
     padding: 20,
     borderTopWidth: 1,

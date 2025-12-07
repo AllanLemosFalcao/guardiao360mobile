@@ -1,4 +1,6 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Dimensions } from 'react-native';
+
+const { width } = Dimensions.get('window');
 
 export const styles = StyleSheet.create({
   container: {
@@ -14,7 +16,6 @@ export const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: '#fff',
     elevation: 2,
-    // Sombra para iOS
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -25,99 +26,92 @@ export const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+  backButton: {
+    padding: 4,
+  },
   
-  // --- Área de Filtros (Topo) ---
-  filtersScroll: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    maxHeight: 60,
-  },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    marginRight: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  filterChipSelected: {
-    backgroundColor: '#B71C1C', // Vermelho Bombeiro
-    borderColor: '#B71C1C',
-  },
-  filterText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#666',
-  },
-  filterTextSelected: {
-    color: '#fff',
-  },
-
-  // --- Seção: Em Andamento (Parte de Cima) ---
-  sectionContainer: {
-    marginTop: 16,
-    marginBottom: 8,
-    paddingHorizontal: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-  },
-  // Card Destacado (Ativo)
-  activeCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginRight: 12,
-    width: 280, // Largura fixa para permitir scroll horizontal
-    borderLeftWidth: 5,
-    borderLeftColor: '#F57C00', // Laranja para "Em andamento"
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  activeCardHeader: {
+  // --- NOVO: Área de Filtros (Dropdowns) ---
+  filtersContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: '#FAFAFA',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  dropdownButton: {
+    flex: 1,
+    backgroundColor: '#FFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#DDD',
+    marginHorizontal: 4,
+    elevation: 1,
+  },
+  dropdownText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+  },
+
+  // --- MODAL (Menu Suspenso) ---
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  activeLabel: {
-    fontSize: 10,
+  modalContent: {
+    width: width * 0.85,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#F57C00',
-    backgroundColor: '#FFF3E0',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    overflow: 'hidden', // Importante para o borderRadius funcionar no texto
+    marginBottom: 15,
+    color: '#1976D2',
+    textAlign: 'center',
   },
-  
-  // --- Seção: Histórico (Parte de Baixo / Grid) ---
-  historyHeader: {
-    marginTop: 20,
-    paddingHorizontal: 16,
-    marginBottom: 10,
+  modalItem: {
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
+  modalItemText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  modalItemTextSelected: {
+    color: '#1976D2',
+    fontWeight: 'bold',
+  },
+
+  // --- Seção: Histórico (Cards Originais Mantidos) ---
   listContent: {
     paddingHorizontal: 12,
     paddingBottom: 20,
+    paddingTop: 10,
   },
   row: {
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  // Card Pequeno (Histórico)
+  // Card Pequeno (Histórico) - MANTIDO IDÊNTICO
   card: {
     backgroundColor: '#fff',
-    width: '48%',
+    width: '48%', // Mantendo 2 colunas
     borderRadius: 12,
     padding: 12,
     elevation: 1,
@@ -139,17 +133,10 @@ export const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#000',
   },
-  statusBadge: {
-    marginTop: 8,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    backgroundColor: '#E8F5E9',
-  },
   statusText: {
+    marginTop: 8,
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#2E7D32',
+    alignSelf: 'flex-start',
   },
 });

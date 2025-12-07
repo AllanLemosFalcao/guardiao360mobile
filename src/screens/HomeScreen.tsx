@@ -13,14 +13,13 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons'; 
 import { RootStackParamList } from '../../App';
 
-// IMPORTAÇÃO DOS ESTILOS SEPARADOS
+// IMPORTAÇÃO DOS ESTILOS
 import { styles } from './HomeScreen.styles';
 
 // Tipagem da navegação
-type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
+type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'MainTabs'>;
 
 export default function HomeScreen() {
-  // Correção: Deixei apenas uma declaração do navigation
   const navigation = useNavigation<HomeScreenNavigationProp>();
   
   // Estado do botão "Em Serviço"
@@ -76,32 +75,37 @@ export default function HomeScreen() {
       <View style={styles.gridContainer}>
         
         {/* Botão 1: Ocorrências (Lista) */}
-        {/* AQUI ESTÁ A MUDANÇA PRINCIPAL: */}
         <TouchableOpacity 
           style={styles.gridButton} 
-          onPress={() => navigation.navigate('Ocorrencias')}
+          onPress={() => navigation.navigate('Ocorrencias' as any)}
         >
           <MaterialCommunityIcons name="shield-alert" size={50} color="#B71C1C" />
           <Text style={styles.gridLabel}>Ocorrências</Text>
         </TouchableOpacity>
 
-        {/* Botão 2: Nova Ocorrência (Navega para o Wizard) */}
+        {/* Botão 2: Nova Ocorrência */}
         <TouchableOpacity 
           style={styles.gridButton} 
-          onPress={() => navigation.navigate('NovaOcorrencia')}
+          onPress={() => navigation.navigate('NovaOcorrencia' as any)}
         >
           <MaterialCommunityIcons name="file-document-plus-outline" size={50} color="#B71C1C" />
           <Text style={styles.gridLabel}>Nova Ocorrência</Text>
         </TouchableOpacity>
 
         {/* Botão 3: Mapa */}
-        <TouchableOpacity style={styles.gridButton} onPress={() => Alert.alert("Em breve", "Mapa georeferenciado")}>
+        <TouchableOpacity 
+          style={styles.gridButton} 
+          onPress={() => navigation.navigate('Mapa' as any)}
+        >
           <MaterialCommunityIcons name="google-maps" size={50} color="#B71C1C" />
           <Text style={styles.gridLabel}>Mapa de Ocorrências</Text>
         </TouchableOpacity>
 
         {/* Botão 4: Leitor QR Code */}
-        <TouchableOpacity style={styles.gridButton} onPress={() => Alert.alert("Em breve", "Leitor de QR Code para equipamentos")}>
+        <TouchableOpacity 
+          style={styles.gridButton} 
+          onPress={() => navigation.navigate('QRCodeScanner' as any)}
+        >
           <MaterialCommunityIcons name="qrcode-scan" size={50} color="#B71C1C" />
           <Text style={styles.gridLabel}>Leitor QR Code</Text>
         </TouchableOpacity>

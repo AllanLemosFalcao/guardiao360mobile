@@ -4,8 +4,8 @@ let db: SQLite.SQLiteDatabase | null = null;
 
 const getDB = async () => {
   if (!db) {
-    // MUDANÇA 1: Alterei para v3 para forçar a recriação das tabelas
-    db = await SQLite.openDatabaseAsync('guardiao360_v3.db');
+    // MUDANÇA: Versão v4 para criar as novas colunas de partida
+    db = await SQLite.openDatabaseAsync('guardiao360_v4.db');
   }
   return db;
 };
@@ -31,6 +31,10 @@ export const initDB = async () => {
         forma_acionamento TEXT,
         local_vtr_acionamento TEXT,
         
+        -- NOVAS COLUNAS: GPS DE PARTIDA --
+        latitude_partida TEXT,
+        longitude_partida TEXT,
+        
         regiao TEXT,
         ais TEXT,
         municipio TEXT,
@@ -41,6 +45,7 @@ export const initDB = async () => {
         complemento TEXT,
         ponto_referencia TEXT,
         
+        -- GPS DE CHEGADA --
         data_hora_chegada_local TEXT,
         latitude_chegada TEXT,
         longitude_chegada TEXT,
@@ -83,10 +88,8 @@ export const initDB = async () => {
         nome_hospital TEXT,
         sofreu_acidente_transito TEXT,
         condicao_seguranca TEXT,
-        
         assinatura_path TEXT,
-        status_assinatura TEXT, -- MUDANÇA 2: Nova coluna adicionada
-        
+        status_assinatura TEXT,
         FOREIGN KEY (ocorrencia_id) REFERENCES ocorrencias(id)
       );
 
@@ -100,7 +103,7 @@ export const initDB = async () => {
         FOREIGN KEY (ocorrencia_id) REFERENCES ocorrencias(id)
       );
     `);
-    console.log('Banco de Dados V3 (com status assinatura) inicializado!');
+    console.log('Banco de Dados V4 (com GPS Partida) inicializado!');
   } catch (error) {
     console.error('Erro ao inicializar tabelas:', error);
     throw error;
