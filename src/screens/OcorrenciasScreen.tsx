@@ -9,6 +9,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App'; 
 import { styles } from './OcorrenciasScreen.styles'; 
 import { executeSql } from '../services/db';
+import { AuthService } from '../services/auth'; // <--- Importe do Auth
 
 type OcorrenciasScreenProp = NativeStackNavigationProp<RootStackParamList, 'Ocorrencias'>;
 
@@ -37,15 +38,23 @@ export default function OcorrenciasScreen() {
   const [modalDataVisible, setModalDataVisible] = useState(false);
   const [modalStatusVisible, setModalStatusVisible] = useState(false);
 
-  // --- CARREGAR DADOS ---
-  const carregarDados = async () => {
+  // --- FUNÇÃO DE CARREGAR DADOS (CORRIGIDA) ---
+  const carregarDados = async () => { // <--- AQUI ESTAVA FALTANDO
     setCarregando(true);
     try {
-      const resultado = await executeSql(`SELECT * FROM ocorrencias ORDER BY id DESC;`);
-      setListaOcorrencias(resultado.rows._array);
+      // 1. Descobre quem sou eu
+      const user = await AuthService.getUsuarioLogado();
+      
+      if (user && user.id) {
+        // 2. Filtra pelo meu ID no SQLite
+        const resultado = await executeSql(
+          `SELECT * FROM ocorrencias WHERE usuario_id = ? ORDER BY id DESC;`, 
+          [user.id]
+        );
+        setListaOcorrencias(resultado.rows._array);
+      }
     } catch (error) {
       console.error("Erro ao buscar ocorrências:", error);
-      Alert.alert("Erro", "Falha ao carregar histórico.");
     } finally {
       setCarregando(false);
     }
@@ -115,18 +124,14 @@ export default function OcorrenciasScreen() {
 
   // --- RENDER ITEM ---
   const renderHistoryItem: ListRenderItem<OcorrenciaBD> = ({ item }) => {
-    // Formata o texto para exibição (tira underline)
     const statusText = item.status?.replace(/_/g, ' ') || 'PENDENTE';
     
-    // Helper para definir a cor baseada no status
     const getStatusColor = (statusRaw: string) => {
         const s = statusRaw ? statusRaw.toUpperCase() : '';
-        
-        if (s.includes('CENA')) return '#1565C0';          // Em Cena (Azul)
-        if (s.includes('DESLOCAMENTO')) return '#B71C1C'; // Em Deslocamento (Vermelho)
-        if (s === 'FINALIZADO') return '#2E7D32';         // Finalizado (Verde)
-        
-        return '#757575'; // Cor padrão (Cinza) para status desconhecidos
+        if (s.includes('CENA')) return '#1565C0';
+        if (s.includes('DESLOCAMENTO')) return '#B71C1C';
+        if (s === 'FINALIZADO') return '#2E7D32';
+        return '#757575';
     };
 
     const statusColor = getStatusColor(item.status);
@@ -154,7 +159,6 @@ export default function OcorrenciasScreen() {
           <Text style={styles.cardLabel}>Vtr: <Text style={styles.cardValue}>{item.tipo_viatura}-{item.numero_viatura}</Text></Text>
         </View>
 
-        {/* Aplicação da cor dinâmica aqui */}
         <Text style={[styles.statusText, { color: statusColor }]}>
           {statusText}
         </Text>

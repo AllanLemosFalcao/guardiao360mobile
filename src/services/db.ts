@@ -2,10 +2,10 @@ import * as SQLite from 'expo-sqlite';
 
 let db: SQLite.SQLiteDatabase | null = null;
 
+// Função auxiliar para garantir que o banco está aberto
 const getDB = async () => {
   if (!db) {
-    // MUDANÇA: Versão v4 para criar as novas colunas de partida
-    db = await SQLite.openDatabaseAsync('guardiao360_v4.db');
+    db = await SQLite.openDatabaseAsync('guardiao360_v5.db');
   }
   return db;
 };
@@ -21,20 +21,30 @@ export const initDB = async () => {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         uuid_local TEXT,
         numero_ocorrencia TEXT,
+        
+        -- DADOS DA CENTRAL (DESPACHO) --
+        latitude_destino TEXT,
+        longitude_destino TEXT,
+        endereco_destino TEXT,
+        prioridade TEXT DEFAULT 'Normal',
+        
+        -- DADOS OPERACIONAIS --
         tipo_viatura TEXT,
         numero_viatura TEXT,
         grupamento TEXT,
         ponto_base TEXT,
         cod_local_ocorrencia TEXT,
+        
         data_acionamento TEXT,
         hora_acionamento TEXT,
         forma_acionamento TEXT,
         local_vtr_acionamento TEXT,
         
-        -- NOVAS COLUNAS: GPS DE PARTIDA --
+        -- GPS DE PARTIDA --
         latitude_partida TEXT,
         longitude_partida TEXT,
         
+        -- ENDEREÇO DA OCORRÊNCIA --
         regiao TEXT,
         ais TEXT,
         municipio TEXT,
@@ -50,27 +60,18 @@ export const initDB = async () => {
         latitude_chegada TEXT,
         longitude_chegada TEXT,
         
-        apoio_orgaos TEXT,
-        viaturas_envolvidas TEXT,
-        dificuldades_atuacao TEXT,
-        
+        -- RELATÓRIO FINAL --
         natureza_final TEXT,
         grupo TEXT,
         subgrupo TEXT,
-        cod_cgo TEXT,
-        
         situacao_ocorrencia TEXT,
         motivo_nao_atendida TEXT,
         detalhe_sem_atuacao TEXT,
-        
         historico_final TEXT,
         chefe_guarnicao TEXT,
-        
         hora_saida_local TEXT,
-        hora_chegada_quartel TEXT,
-        km_final TEXT,
         
-        status TEXT DEFAULT 'RASCUNHO',
+        status TEXT DEFAULT 'DESPACHADA',
         data_criacao TEXT DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -95,44 +96,35 @@ export const initDB = async () => {
 
       CREATE TABLE IF NOT EXISTS midias (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario_id INTEGER,
         ocorrencia_id INTEGER,
         caminho_arquivo TEXT,
         tipo TEXT,
         data_captura TEXT,
-        legenda TEXT,
         FOREIGN KEY (ocorrencia_id) REFERENCES ocorrencias(id)
       );
     `);
-    console.log('Banco de Dados V4 (com GPS Partida) inicializado!');
+    console.log('Banco de Dados V5 inicializado!');
   } catch (error) {
-    console.error('Erro ao inicializar tabelas:', error);
-    throw error;
+    console.error('Erro ao inicializar DB:', error);
   }
 };
 
 export const executeSql = async (sql: string, params: any[] = []) => {
+  // Garante que temos uma conexão válida antes de tentar executar
   const database = await getDB();
+  
   const isSelect = sql.trim().toUpperCase().startsWith('SELECT');
-
   try {
     if (isSelect) {
       const rows = await database.getAllAsync(sql, params);
-      return { 
-        rows: { 
-          _array: rows, 
-          length: rows.length,
-          item: (idx: number) => rows[idx] 
-        } 
-      };
+      return { rows: { _array: rows, length: rows.length, item: (idx: number) => rows[idx] } };
     } else {
       const result = await database.runAsync(sql, params);
-      return {
-        insertId: result.lastInsertRowId,
-        rowsAffected: result.changes
-      };
+      return { insertId: result.lastInsertRowId, rowsAffected: result.changes };
     }
   } catch (error) {
-    console.error("Erro no executeSql:", error);
+    console.error("SQL Error:", error);
     throw error;
   }
 };

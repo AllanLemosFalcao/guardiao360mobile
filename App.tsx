@@ -1,10 +1,13 @@
-import React, { useEffect } from 'react';
-import { View, Platform } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Platform, ActivityIndicator, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import NetInfo from '@react-native-community/netinfo';
+import { sincronizarDados } from './src/services/syncService';
+import { AuthService } from './src/services/auth'; // <--- IMPORTANTE
 
 // --- IMPORTS DAS TELAS ---
 import LoginScreen from './src/screens/LoginScreen';
@@ -45,153 +48,140 @@ function AppTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: '#B71C1C', // Vermelho ativo
-        tabBarInactiveTintColor: '#999',  // Cinza inativo
+        tabBarActiveTintColor: '#B71C1C',
+        tabBarInactiveTintColor: '#999',
         tabBarStyle: {
           height: Platform.OS === 'ios' ? 88 : 60,
           paddingBottom: Platform.OS === 'ios' ? 28 : 8,
           backgroundColor: '#FFFFFF',
           borderTopColor: '#eee',
         },
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '600',
-        },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
       })}
     >
-      {/* 1. MAPA (Esquerda) */}
       <Tab.Screen 
-        name="Mapa" 
-        component={MapaScreen} 
+        name="Mapa" component={MapaScreen} 
         options={{
           tabBarLabel: 'Mapa',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="google-maps" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="google-maps" size={size} color={color} />,
         }}
       />
-
-      {/* 2. NOTIFICAÇÕES */}
       <Tab.Screen 
-        name="NotificacoesTab" 
-        component={NotificacoesScreen} 
+        name="NotificacoesTab" component={NotificacoesScreen} 
         options={{
           tabBarLabel: 'Avisos',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="bell" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <Feather name="bell" size={size} color={color} />,
           tabBarBadge: 3, 
         }}
       />
-
-      {/* 3. HOME (Centro) */}
       <Tab.Screen 
-        name="HomeTab" 
-        component={HomeScreen} 
+        name="HomeTab" component={HomeScreen} 
         options={{
           tabBarLabel: 'Início',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="home-variant" size={32} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="home-variant" size={32} color={color} />,
         }}
       />
-
-      {/* 4. NOVA OCORRÊNCIA (Botão de Ação) */}
       <Tab.Screen 
-        name="NovaOcorrenciaTab" 
-        component={View} 
+        name="NovaOcorrenciaTab" component={View} 
         listeners={({ navigation }) => ({
-          tabPress: (e) => {
-            e.preventDefault();
-            navigation.navigate('NovaOcorrencia');
-          },
+          tabPress: (e) => { e.preventDefault(); navigation.navigate('NovaOcorrencia'); },
         })}
         options={{
           tabBarLabel: 'Nova',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="plus-circle-outline" size={32} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="plus-circle-outline" size={32} color={color} />,
         }}
       />
-
-      {/* 5. CONFIGURAÇÕES (Direita) */}
       <Tab.Screen 
-        name="ConfiguracoesTab" 
-        component={ConfiguracoesScreen} 
+        name="ConfiguracoesTab" component={ConfiguracoesScreen} 
         options={{
           tabBarLabel: 'Ajustes',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="settings" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <Feather name="settings" size={size} color={color} />,
         }}
       />
     </Tab.Navigator>
   );
 }
 
-// --- APP PRINCIPAL ---
+// --- APP PRINCIPAL BLINDADO ---
 export default function App() {
-  
-  // Inicializa o Banco
+  // Estado para controlar o carregamento inicial (Splash Screen)
+  const [isReady, setReady] = useState(false);
+  // Estado para decidir qual tela abrir primeiro (Login ou Home)
+  const [initialRoute, setInitialRoute] = useState<'Login' | 'MainTabs'>('Login');
+
+  // 1. EFEITO DE INICIALIZAÇÃO (Sequencial e Seguro)
   useEffect(() => {
-    initDB()
-      .then(() => {
-        console.log('Banco de Dados Local Inicializado com Sucesso!');
-      })
-      .catch((err) => {
-        console.log('Falha ao criar banco de dados: ', err);
-      });
+    const prepararApp = async () => {
+      try {
+        // A. Inicia o Banco de Dados
+        await initDB();
+        console.log('✅ Banco de Dados Inicializado!');
+
+        // B. Verifica se já existe usuário logado (Auto-Login)
+        const token = await AuthService.getToken();
+        if (token) {
+          console.log("🔓 Token encontrado! Login automático.");
+          setInitialRoute('MainTabs');
+        } else {
+          console.log("🔒 Nenhum token. Indo para Login.");
+        }
+
+      } catch (e) {
+        console.warn(e);
+      } finally {
+        // C. Libera o App para renderizar
+        setReady(true);
+      }
+    };
+
+    prepararApp();
   }, []);
 
+  // 2. MONITOR DE REDE (Só liga DEPOIS que o app estiver pronto)
+  useEffect(() => {
+    if (!isReady) return; // Se ainda tá carregando, não liga o ouvido
+
+    const unsubscribe = NetInfo.addEventListener(state => {
+      if (state.isConnected && state.isInternetReachable) {
+        console.log("📶 Conexão detectada! Verificando pendências...");
+        // Pequeno delay para garantir estabilidade
+        setTimeout(() => sincronizarDados(true), 1000);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [isReady]);
+
+  // --- TELA DE CARREGAMENTO (SPLASH) ---
+  // Enquanto o banco e o login não checam, mostra isso:
+  if (!isReady) {
+    return (
+      <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff'}}>
+        <ActivityIndicator size="large" color="#B71C1C" />
+        <Text style={{marginTop: 20, color: '#555'}}>Iniciando Guardião 360...</Text>
+      </View>
+    );
+  }
+
+  // --- NAVEGAÇÃO PRINCIPAL ---
   return (
     <NavigationContainer>
       <StatusBar style="dark" backgroundColor="#ffffff" />
       
       <Stack.Navigator 
-        initialRouteName="Login"
+        initialRouteName={initialRoute} // <--- Define dinamicamente onde começar
         screenOptions={{ headerShown: false }}
       >
-        {/* Tela de Login */}
         <Stack.Screen name="Login" component={LoginScreen} />
-
-        {/* Abas Principais */}
         <Stack.Screen name="MainTabs" component={AppTabs} />
         
-        {/* Modais e Fluxo de Ocorrência */}
-        <Stack.Screen 
-          name="NovaOcorrencia" 
-          component={NovaOcorrenciaScreen} 
-          options={{ presentation: 'modal' }}
-        />
-        
+        <Stack.Screen name="NovaOcorrencia" component={NovaOcorrenciaScreen} options={{ presentation: 'modal' }} />
         <Stack.Screen name="Ocorrencias" component={OcorrenciasScreen} />
-
-        <Stack.Screen 
-          name="DetalhesOcorrencia" 
-          component={DetalhesOcorrenciaScreen}
-          options={{ 
-            headerShown: true, 
-            title: 'Atendimento em Andamento',
-            headerBackVisible: false 
-          }} 
-        />
-
-        <Stack.Screen 
-          name="ChegadaCena" 
-          component={ChegadaCenaScreen}
-          options={{ headerShown: false }} 
-        />
-
-        <Stack.Screen 
-          name="RelatorioFinal" 
-          component={RelatorioFinalScreen}
-          options={{ headerShown: false }} 
-        />
-
+        <Stack.Screen name="DetalhesOcorrencia" component={DetalhesOcorrenciaScreen} options={{ headerShown: true, title: 'Atendimento', headerBackVisible: false }} />
+        <Stack.Screen name="ChegadaCena" component={ChegadaCenaScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="RelatorioFinal" component={RelatorioFinalScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Timeline" component={TimelineScreen} />
-        
         <Stack.Screen name="QRCodeScanner" component={QRCodeScannerScreen} />
-
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -143,19 +143,57 @@ await executeSql(
     }
   };
   
+  // --- FUNÇÃO ATUALIZADA: FOTO E VÍDEO ---
   const handleCamera = async (tipo: 'foto' | 'video') => {
-    if (!dbId) { Alert.alert("Erro", "ID não encontrado."); return; }
-    if (tipo === 'video') { Alert.alert("Em breve", "Vídeo no próximo ciclo."); return; }
+    if (!dbId) { 
+      Alert.alert("Erro", "ID da ocorrência não encontrado."); 
+      return; 
+    }
+
     try {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) { Alert.alert("Permissão", "Necessário acesso à câmera."); return; }
-      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.5 });
-      if (!result.canceled) {
-        await executeSql(`INSERT INTO midias (ocorrencia_id, caminho_arquivo, tipo, data_captura) VALUES (?, ?, 'FOTO', ?);`, [dbId, result.assets[0].uri, new Date().toISOString()]);
-        setFotosQtd(prev => prev + 1);
-        Alert.alert("Foto Salva", "Anexada com sucesso.");
+      // 1. Solicita APENAS permissão de Câmera (O microfone é automático no sistema)
+      const permissionCam = await ImagePicker.requestCameraPermissionsAsync();
+
+      if (!permissionCam.granted) { 
+        Alert.alert("Permissão Necessária", "Precisamos de acesso à câmera para registrar a cena."); 
+        return; 
       }
-    } catch (error) { Alert.alert("Erro", "Falha na câmera."); }
+
+      // 2. Configura o tipo de mídia
+      const mediaType = tipo === 'video' 
+        ? ImagePicker.MediaTypeOptions.Videos 
+        : ImagePicker.MediaTypeOptions.Images;
+
+      // 3. Abre a Câmera do Sistema
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: mediaType,
+        quality: 0.5,
+        videoMaxDuration: 60,
+        allowsEditing: false,
+      });
+
+      // 4. Salva se deu certo
+      if (!result.canceled) {
+        const asset = result.assets[0];
+        const tipoNoBanco = tipo === 'video' ? 'VIDEO' : 'FOTO';
+
+        await executeSql(
+          `INSERT INTO midias (ocorrencia_id, caminho_arquivo, tipo, data_captura) VALUES (?, ?, ?, ?);`, 
+          [dbId, asset.uri, tipoNoBanco, new Date().toISOString()]
+        );
+
+        setFotosQtd(prev => prev + 1);
+        
+        Alert.alert(
+          tipo === 'video' ? "Vídeo Salvo" : "Foto Salva", 
+          "Mídia anexada com sucesso."
+        );
+      }
+
+    } catch (error) { 
+      console.log(error);
+      Alert.alert("Erro", "Falha ao abrir a câmera."); 
+    }
   };
 
   const handleSalvar = async () => {

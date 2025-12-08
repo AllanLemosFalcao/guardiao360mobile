@@ -9,17 +9,20 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-
+import { AuthService } from '../services/auth';
 import { styles } from './ConfiguracoesScreen.styles';
 
 export default function ConfiguracoesScreen() {
   const navigation = useNavigation();
 
-  const handleLogout = () => {
-    // Aqui viria a lógica de limpar sessão
-    navigation.navigate('Login' as never);
+const handleLogout = async () => {
+    await AuthService.logout(); // Limpa o cofre
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Login' }], // Joga pro Login e limpa o histórico de navegação
+    });
   };
-
+  
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView>

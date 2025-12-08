@@ -16,6 +16,7 @@ import * as Location from 'expo-location';
 import { RootStackParamList } from '../../App';
 import { styles } from './NovaOcorrenciaScreen.styles';
 import { executeSql } from '../services/db';
+import { AuthService } from '../services/auth';
 
 type NovaOcorrenciaProp = NativeStackNavigationProp<RootStackParamList, 'NovaOcorrencia'>;
 type NovaOcorrenciaRouteProp = RouteProp<RootStackParamList, 'NovaOcorrencia'>;
@@ -151,6 +152,7 @@ export default function NovaOcorrenciaScreen() {
 
   // --- FUNÇÃO 2: SALVAR NO BANCO (BOTÃO FINAL) ---
   const handleFinalizar = async () => {
+    const handleFinalizar = async () => {
     if (!tipoViatura || !numeroViatura || !grupamento) {
       Alert.alert("Campos Obrigatórios", "Preencha a Viatura, Número e Grupamento.");
       return;
@@ -163,6 +165,9 @@ export default function NovaOcorrenciaScreen() {
     setSalvando(true);
 
     try {
+      // 1. Pega o usuário logado do cofre
+      const userLogado = await AuthService.getUsuarioLogado();
+      const meuId = userLogado ? userLogado.id : null;
       if (isEdicao) {
         // UPDATE
         await executeSql(
@@ -181,24 +186,25 @@ export default function NovaOcorrenciaScreen() {
         Alert.alert("Atualizado", "Dados corrigidos com sucesso!");
         navigation.goBack(); 
 
-      } else {
-        // INSERT
+} else {
+        // INSERT COM O ID DO DONO
         const numeroOcorrencia = `B-2025-${Math.floor(Math.random() * 10000)}`;
         const uuidLocal = Date.now().toString() + Math.floor(Math.random() * 1000).toString();
 
         const result = await executeSql(
           `INSERT INTO ocorrencias (
-            uuid_local, numero_ocorrencia, tipo_viatura, numero_viatura, grupamento,
+            usuario_id, uuid_local, numero_ocorrencia, tipo_viatura, numero_viatura, grupamento,
             ponto_base, cod_local_ocorrencia, forma_acionamento, local_vtr_acionamento, status,
             data_acionamento, hora_acionamento, latitude_partida, longitude_partida
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
           [
+            meuId, // <--- ADICIONADO AQUI
             uuidLocal, numeroOcorrencia, tipoViatura, numeroViatura, grupamento,
             pontoBase, codLocal, formaAcionamento, localAcionamento, 'EM_DESLOCAMENTO',
             dataSaida, horaSaida, gpsSaida.lat, gpsSaida.long
           ]
         );
-
+        
         if (result.insertId) {
           navigation.replace('DetalhesOcorrencia', {
             idOcorrencia: numeroOcorrencia,

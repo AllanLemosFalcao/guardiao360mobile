@@ -8,6 +8,7 @@ import { styles } from './RelatorioFinalScreen.styles';
 import { RootStackParamList } from '../../App';
 import SignatureScreen from 'react-native-signature-canvas';
 import { executeSql } from '../services/db';
+import { sincronizarDados } from '../services/syncService';
 
 type RelatorioFinalRouteProp = RouteProp<RootStackParamList, 'RelatorioFinal'>;
 
@@ -218,6 +219,7 @@ export default function RelatorioFinalScreen() {
             } 
 
             Alert.alert("Sucesso", "Relatório atualizado/finalizado!");
+            sincronizarDados(true).catch(e => console.log("Erro sync imediato (normal se offline)"));
             navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
           } catch (error) { console.error(error); Alert.alert("Erro", "Falha ao salvar."); } finally { setSalvando(false); }
         }
