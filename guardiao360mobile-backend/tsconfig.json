@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    /* Configurações de Módulo */
+    "target": "es2016",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "rootDir": "./src",
+    "outDir": "./dist",
+    
+    /* Interoperabilidade */
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* Checagem de Tipos */
+    "strict": true,
+    "skipLibCheck": true,
+
+    /* A SOLUÇÃO DO SEU ERRO ESTÁ AQUI: */
+    "verbatimModuleSyntax": false
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}
