@@ -83,7 +83,6 @@ export default function LoginScreen() {
         </TouchableOpacity>
         
         <Text style={{textAlign:'center', marginTop:20, color:'#ccc', fontSize:10}}>
-          Dica: admin@bombeiros.pe.gov.br / 123
         </Text>
       </View>
     </SafeAreaView>

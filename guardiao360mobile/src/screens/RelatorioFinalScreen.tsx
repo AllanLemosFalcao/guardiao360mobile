@@ -354,7 +354,7 @@ export default function RelatorioFinalScreen() {
         </View>
 
         <TouchableOpacity style={[styles.submitButton, salvando && { opacity: 0.7 }]} onPress={handleFinalizar} disabled={salvando}>
-          <Text style={styles.submitButtonText}>{salvando ? 'SALVANDO...' : 'ATUALIZAR RELATÓRIO'}</Text>
+          <Text style={styles.submitButtonText}>{salvando ? 'SALVANDO...' : 'SALVAR'}</Text>
         </TouchableOpacity>
       </ScrollView>
 

@@ -203,7 +203,7 @@ export default function OcorrenciasScreen() {
             status: item.status
           }
         })}
-        onLongPress={() => confirmarExclusaoRapida(item.id, item.numero_ocorrencia)}
+
       >
         <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center'}}>
            <Text style={styles.cardTitle}>{item.numero_ocorrencia || `ID: ${item.id}`}</Text>

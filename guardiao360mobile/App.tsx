@@ -7,7 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
 import { sincronizarDados } from './src/services/syncService';
-import { AuthService } from './src/services/auth'; // <--- IMPORTANTE
+import { AuthService } from './src/services/auth'; 
 
 // --- IMPORTS DAS TELAS ---
 import LoginScreen from './src/screens/LoginScreen';
@@ -46,6 +46,7 @@ const Tab = createBottomTabNavigator();
 function AppTabs() {
   return (
     <Tab.Navigator
+      initialRouteName="HomeTab" //  Home como aba inicial
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: '#B71C1C',
@@ -169,7 +170,7 @@ export default function App() {
       <StatusBar style="dark" backgroundColor="#ffffff" />
       
       <Stack.Navigator 
-        initialRouteName={initialRoute} // <--- Define dinamicamente onde começar
+        initialRouteName={initialRoute} // 
         screenOptions={{ headerShown: false }}
       >
         <Stack.Screen name="Login" component={LoginScreen} />

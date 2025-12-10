@@ -22,7 +22,6 @@ const formatarDataParaMySQL = (dataStr: string) => {
 // --- FUNÇÃO 1: DOWNLOAD (Nuvem -> Celular) ---
 export const baixarDadosDoServidor = async () => {
   try {
-    // 1. Pega usuário e Token (CORREÇÃO AQUI)
     const user = await AuthService.getUsuarioLogado();
     const token = await AuthService.getToken();
 
@@ -30,12 +29,10 @@ export const baixarDadosDoServidor = async () => {
 
     console.log("⬇️ Verificando dados na nuvem...");
 
-    // 2. Configura o cabeçalho com o Token
     const config = {
       headers: { Authorization: `Bearer ${token}` }
     };
 
-    // 3. Busca no Backend enviando o Token
     const response = await api.get(`/ocorrencias?usuario_id=${user.id}`, config);
     const ocorrenciasNuvem = response.data;
 
@@ -51,12 +48,14 @@ export const baixarDadosDoServidor = async () => {
         
         if (existe.rows.length === 0) {
           // NÃO EXISTE: Vamos salvar no SQLite
+          
+          // CORREÇÃO AQUI: O status agora é dinâmico (?) e não fixo 'FINALIZADO'
           await executeSql(
             `INSERT INTO ocorrencias (
               usuario_id, uuid_local, numero_ocorrencia, tipo_viatura, numero_viatura, 
               grupamento, ponto_base, data_acionamento, hora_acionamento,
               natureza_final, status, situacao_ocorrencia
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'FINALIZADO', ?);`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`, 
             [
               user.id, 
               oco.uuid_local || `SVR-${Date.now()}-${Math.random()}`, 
@@ -68,6 +67,7 @@ export const baixarDadosDoServidor = async () => {
               oco.data_acionamento, 
               oco.hora_acionamento,
               oco.natureza_final,
+              oco.status || 'FINALIZADO', // <--- AGORA USA O STATUS REAL DO SERVIDOR
               oco.situacao_ocorrencia || 'Atendida'
             ]
           );
@@ -93,7 +93,6 @@ export const baixarDadosDoServidor = async () => {
 export const sincronizarDados = async (silencioso = false) => {
   if (isSyncing) return;
 
-  // Pega o Token
   const token = await AuthService.getToken();
   if (!token) {
     if (!silencioso) Alert.alert("Sessão Expirada", "Faça login novamente.");
@@ -103,11 +102,12 @@ export const sincronizarDados = async (silencioso = false) => {
   try {
     isSyncing = true;
     
-    // 1. PRIMEIRO: Baixa o que tem de novo
+    // 1. Download
     await baixarDadosDoServidor();
 
     if (!silencioso) console.log("🔄 Enviando pendências...");
 
+    // Pega apenas o que está FINALIZADO localmente para subir
     const resOco = await executeSql(
       `SELECT * FROM ocorrencias WHERE status = 'FINALIZADO';`
     );

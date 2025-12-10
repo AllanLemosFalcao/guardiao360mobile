@@ -15,8 +15,9 @@ export default function MapaScreen() {
   const [region, setRegion] = useState<any>(null);
   const [marcadores, setMarcadores] = useState<any[]>([]);
   
+  // Filtros
   const [filtroTempo, setFiltroTempo] = useState<'HOJE' | '7D' | '30D' | 'TODOS'>('TODOS');
-  const [filtroStatus, setFiltroStatus] = useState<'TODOS' | 'EM ANDAMENTO' | 'FINALIZADOS'>('TODOS');
+  const [filtroStatus, setFiltroStatus] = useState<'TODOS' | 'EM_ANDAMENTO' | 'FINALIZADO'>('TODOS');
 
   const [modalTempoVisivel, setModalTempoVisivel] = useState(false);
   const [modalStatusVisivel, setModalStatusVisivel] = useState(false);
@@ -63,16 +64,14 @@ export default function MapaScreen() {
     }, [])
   );
 
-  // --- HELPER: DATA (CORRIGIDO PARA ISO + BR) ---
+  // --- HELPER: DATA ---
   const parseData = (dataStr: string) => {
     if (!dataStr) return null;
     try {
-      // Formato ISO: YYYY-MM-DD
       if (dataStr.includes('-')) {
         const [ano, mes, dia] = dataStr.split('-').map(Number);
         return new Date(ano, mes - 1, dia);
       }
-      // Formato BR: DD/MM/YYYY
       const partes = dataStr.split('/'); 
       if (partes.length === 3) {
         return new Date(parseInt(partes[2]), parseInt(partes[1]) - 1, parseInt(partes[0]));
@@ -81,35 +80,44 @@ export default function MapaScreen() {
     } catch (e) { return null; }
   };
 
-  // --- 3. LÓGICA DE FILTRAGEM CORRIGIDA ---
+  // --- 3. LÓGICA DE FILTRAGEM (AJUSTADA) ---
   const getMarcadoresFiltrados = () => {
     return marcadores.filter(item => {
       const statusRaw = item.status || ''; 
-      const statusNormalizado = statusRaw.toString().toUpperCase().trim();
+      const s = statusRaw.toString().toUpperCase().trim();
       
-      // CORREÇÃO AQUI: "Finalizado" inclui quem já foi "Enviado"
-      const isFinalizado = statusNormalizado === 'FINALIZADO' || statusNormalizado === 'ENVIADO';
+      // Definição: Finalizado é quem já acabou ou já foi enviado
+      const isFinalizado = s === 'FINALIZADO' || s === 'ENVIADO';
+      
+      // Definição Implícita: "Em Andamento" é tudo que NÃO é finalizado 
+      // (Isso inclui EM_DESLOCAMENTO, EM_CENA, PENDENTE, etc.)
 
-      // Filtro A: Status
-      if (filtroStatus === 'EM ANDAMENTO' && isFinalizado) return false;
-      if (filtroStatus === 'FINALIZADOS' && !isFinalizado) return false;
+      // 1. Filtro de STATUS
+      if (filtroStatus === 'EM_ANDAMENTO') {
+         // Se quero ver as ativas, escondo as finalizadas
+         if (isFinalizado) return false;
+      }
+      
+      if (filtroStatus === 'FINALIZADO') {
+         // Se quero ver as finalizadas, escondo as ativas
+         if (!isFinalizado) return false;
+      }
 
-      // Filtro B: Tempo
-      if (filtroTempo === 'TODOS') return true;
+      // 2. Filtro de TEMPO
+      if (filtroTempo !== 'TODOS') {
+        const dataItem = parseData(item.data_acionamento);
+        if (dataItem) {
+           const hoje = new Date();
+           hoje.setHours(0,0,0,0);
+           dataItem.setHours(0,0,0,0);
+           const diffTime = hoje.getTime() - dataItem.getTime();
+           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      const dataItem = parseData(item.data_acionamento);
-      if (!dataItem) return true; 
-
-      const hoje = new Date();
-      hoje.setHours(0,0,0,0);
-      dataItem.setHours(0,0,0,0);
-
-      const diffTime = hoje.getTime() - dataItem.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      if (filtroTempo === 'HOJE' && diffDays !== 0) return false;
-      if (filtroTempo === '7D' && (diffDays < 0 || diffDays > 7)) return false;
-      if (filtroTempo === '30D' && (diffDays < 0 || diffDays > 30)) return false;
+           if (filtroTempo === 'HOJE' && diffDays !== 0) return false;
+           if (filtroTempo === '7D' && (diffDays < 0 || diffDays > 7)) return false;
+           if (filtroTempo === '30D' && (diffDays < 0 || diffDays > 30)) return false;
+        }
+      }
 
       return true;
     });
@@ -129,8 +137,8 @@ export default function MapaScreen() {
 
   const getLabelStatus = () => {
     switch(filtroStatus) {
-      case 'EM ANDAMENTO': return 'EM ANDAMENTO';
-      case 'FINALIZADOS': return 'Finalizadas';
+      case 'EM_ANDAMENTO': return 'Em Andamento'; // Cobre Deslocamento + Cena
+      case 'FINALIZADO': return 'Finalizadas';
       default: return 'Todos Status';
     }
   };
@@ -187,16 +195,14 @@ export default function MapaScreen() {
           const lat = parseFloat(item.latitude_chegada);
           const long = parseFloat(item.longitude_chegada);
           
-          const statusRaw = item.status || ''; 
-          const s = statusRaw.toString().toUpperCase().trim();
-          // CORREÇÃO DA COR DO PIN TAMBÉM
+          const s = (item.status || '').toString().toUpperCase().trim();
           const isFinalizado = s === 'FINALIZADO' || s === 'ENVIADO';
           
           return (
             <Marker
-              key={index}
+              key={`${item.id}_${filtroStatus}`}
               coordinate={{ latitude: lat, longitude: long }}
-              pinColor={isFinalizado ? 'green' : 'red'}
+              pinColor={isFinalizado ? 'green' : 'red'} // Verde = Finalizado, Vermelho = Ativo
               zIndex={isFinalizado ? 1 : 10}
             >
               <Callout tooltip onPress={() => irParaDetalhes(item)}>
@@ -220,7 +226,7 @@ export default function MapaScreen() {
         })}
       </MapView>
 
-      {/* LEGENDA */}
+      {/* LEGENDA ATUALIZADA */}
       <View style={styles.legendContainer}>
         <Text style={{fontSize:10, color:'#999', marginBottom:4}}>
           Exibindo {marcadoresVisiveis.length} de {marcadores.length}
@@ -235,22 +241,14 @@ export default function MapaScreen() {
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Filtrar Período</Text>
-              <TouchableOpacity style={styles.modalItem} onPress={() => { setFiltroTempo('HOJE'); setModalTempoVisivel(false); }}>
-                <Text style={[styles.modalItemText, filtroTempo === 'HOJE' && styles.modalItemTextSelected]}>Hoje (Plantão)</Text>
-                {filtroTempo === 'HOJE' && <Feather name="check" size={18} color="#1976D2" />}
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalItem} onPress={() => { setFiltroTempo('7D'); setModalTempoVisivel(false); }}>
-                <Text style={[styles.modalItemText, filtroTempo === '7D' && styles.modalItemTextSelected]}>Últimos 7 dias</Text>
-                {filtroTempo === '7D' && <Feather name="check" size={18} color="#1976D2" />}
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalItem} onPress={() => { setFiltroTempo('30D'); setModalTempoVisivel(false); }}>
-                <Text style={[styles.modalItemText, filtroTempo === '30D' && styles.modalItemTextSelected]}>Último Mês</Text>
-                {filtroTempo === '30D' && <Feather name="check" size={18} color="#1976D2" />}
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalItem} onPress={() => { setFiltroTempo('TODOS'); setModalTempoVisivel(false); }}>
-                <Text style={[styles.modalItemText, filtroTempo === 'TODOS' && styles.modalItemTextSelected]}>Todo o Histórico</Text>
-                {filtroTempo === 'TODOS' && <Feather name="check" size={18} color="#1976D2" />}
-              </TouchableOpacity>
+              {['TODOS', 'HOJE', '7D', '30D'].map((opt: any) => (
+                <TouchableOpacity key={opt} style={styles.modalItem} onPress={() => { setFiltroTempo(opt); setModalTempoVisivel(false); }}>
+                  <Text style={[styles.modalItemText, filtroTempo === opt && styles.modalItemTextSelected]}>
+                     {opt === 'TODOS' ? 'Todo o Histórico' : opt === 'HOJE' ? 'Hoje' : opt === '7D' ? 'Últimos 7 dias' : 'Último mês'}
+                  </Text>
+                  {filtroTempo === opt && <Feather name="check" size={18} color="#1976D2" />}
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
         </TouchableWithoutFeedback>
@@ -262,18 +260,14 @@ export default function MapaScreen() {
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Filtrar Status</Text>
-              <TouchableOpacity style={styles.modalItem} onPress={() => { setFiltroStatus('TODOS'); setModalStatusVisivel(false); }}>
-                <Text style={[styles.modalItemText, filtroStatus === 'TODOS' && styles.modalItemTextSelected]}>Todos</Text>
-                {filtroStatus === 'TODOS' && <Feather name="check" size={18} color="#1976D2" />}
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalItem} onPress={() => { setFiltroStatus('EM ANDAMENTO'); setModalStatusVisivel(false); }}>
-                <Text style={[styles.modalItemText, filtroStatus === 'EM ANDAMENTO' && styles.modalItemTextSelected]}>Em andamento</Text>
-                {filtroStatus === 'EM ANDAMENTO' && <Feather name="check" size={18} color="#1976D2" />}
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalItem} onPress={() => { setFiltroStatus('FINALIZADOS'); setModalStatusVisivel(false); }}>
-                <Text style={[styles.modalItemText, filtroStatus === 'FINALIZADOS' && styles.modalItemTextSelected]}>Finalizadas</Text>
-                {filtroStatus === 'FINALIZADOS' && <Feather name="check" size={18} color="#1976D2" />}
-              </TouchableOpacity>
+              {['TODOS', 'EM_ANDAMENTO', 'FINALIZADO'].map((opt: any) => (
+                <TouchableOpacity key={opt} style={styles.modalItem} onPress={() => { setFiltroStatus(opt); setModalStatusVisivel(false); }}>
+                  <Text style={[styles.modalItemText, filtroStatus === opt && styles.modalItemTextSelected]}>
+                    {opt === 'TODOS' ? 'Todos' : opt === 'EM_ANDAMENTO' ? 'Em Andamento' : 'Finalizadas'}
+                  </Text>
+                  {filtroStatus === opt && <Feather name="check" size={18} color="#1976D2" />}
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
         </TouchableWithoutFeedback>
