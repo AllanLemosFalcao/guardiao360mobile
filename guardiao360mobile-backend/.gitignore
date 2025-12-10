@@ -1,0 +1,22 @@
+# --- Dependências (Pesado demais, não subir) ---
+node_modules/
+
+# --- Segurança (CRÍTICO: Nunca suba suas senhas) ---
+.env
+.env.local
+.env.*.local
+
+# --- Build (Arquivos gerados pelo TypeScript) ---
+dist/
+build/
+
+# --- Logs de erros ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# --- Sistema Operacional (Lixo do Mac/Windows) ---
+.DS_Store
+Thumbs.db

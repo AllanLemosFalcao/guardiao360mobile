@@ -1,14 +1,17 @@
+// src/routes/api.ts
 import { Router } from 'express';
 import { OcorrenciaController } from '../controllers/OcorrenciaController';
-import { AuthController } from '../controllers/AuthController'; // <--- IMPORTAR
+import { AuthController } from '../controllers/AuthController';
+import { authMiddleware } from '../middleware/authMiddleware'; // 
 
 const router = Router();
 
-// --- ROTAS DE AUTENTICAÇÃO ---
-router.post('/login', AuthController.login); // <--- NOVA ROTA
+// --- ROTAS PÚBLICAS ---
+router.post('/login', AuthController.login);
 
-// --- ROTAS DE OCORRÊNCIAS ---
-router.post('/ocorrencias', OcorrenciaController.criar);
-router.get('/ocorrencias', OcorrenciaController.listar);
+// --- ROTAS PROTEGIDAS (Exigem Token) ---
+router.post('/ocorrencias', authMiddleware, OcorrenciaController.criar);
+router.get('/ocorrencias', authMiddleware, OcorrenciaController.listar);
+router.delete('/ocorrencias/:identificador', authMiddleware, OcorrenciaController.excluir);
 
 export default router;
