@@ -4,7 +4,6 @@ import {
   Text, 
   TextInput, 
   TouchableOpacity, 
-  SafeAreaView, 
   ScrollView,
   Alert,
   ActivityIndicator
@@ -17,6 +16,7 @@ import { RootStackParamList } from '../../App';
 import { styles } from './NovaOcorrenciaScreen.styles';
 import { executeSql } from '../services/db';
 import { AuthService } from '../services/auth';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type NovaOcorrenciaProp = NativeStackNavigationProp<RootStackParamList, 'NovaOcorrencia'>;
 type NovaOcorrenciaRouteProp = RouteProp<RootStackParamList, 'NovaOcorrencia'>;
@@ -84,7 +84,7 @@ export default function NovaOcorrenciaScreen() {
   
   // --- ESTADOS DE SAÍDA (DATA/HORA/GPS) ---
   const [saidaRegistrada, setSaidaRegistrada] = useState(false);
-  const [dataSaida, setDataSaida] = useState('');
+  const [dataSaida, setDataSaida] = useState(''); // Guarda ISO: YYYY-MM-DD
   const [horaSaida, setHoraSaida] = useState('');
   const [gpsSaida, setGpsSaida] = useState({ lat: '', long: '' });
   const [capturando, setCapturando] = useState(false);
@@ -119,12 +119,17 @@ export default function NovaOcorrenciaScreen() {
   const handleRegistrarSaida = async () => {
     setCapturando(true);
     try {
-      // 1. Data e Hora
-      const agora = new Date();
-      const d = agora.toLocaleDateString('pt-BR');
-      const h = agora.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+      const now = new Date();
       
-      // 2. GPS
+      // Formatação Manual para ISO (YYYY-MM-DD) para compatibilidade com MySQL
+      const ano = now.getFullYear();
+      const mes = String(now.getMonth() + 1).padStart(2, '0');
+      const dia = String(now.getDate()).padStart(2, '0');
+      const dataFormatadaISO = `${ano}-${mes}-${dia}`;
+      
+      const h = now.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+      
+      // GPS
       let lat = ''; 
       let long = '';
       
@@ -137,8 +142,8 @@ export default function NovaOcorrenciaScreen() {
         long = location.coords.longitude.toString();
       }
 
-      // 3. Atualiza Estado
-      setDataSaida(d);
+      // Atualiza Estado
+      setDataSaida(dataFormatadaISO);
       setHoraSaida(h);
       setGpsSaida({ lat, long });
       setSaidaRegistrada(true);
@@ -152,7 +157,6 @@ export default function NovaOcorrenciaScreen() {
 
   // --- FUNÇÃO 2: SALVAR NO BANCO (BOTÃO FINAL) ---
   const handleFinalizar = async () => {
-    const handleFinalizar = async () => {
     if (!tipoViatura || !numeroViatura || !grupamento) {
       Alert.alert("Campos Obrigatórios", "Preencha a Viatura, Número e Grupamento.");
       return;
@@ -168,6 +172,7 @@ export default function NovaOcorrenciaScreen() {
       // 1. Pega o usuário logado do cofre
       const userLogado = await AuthService.getUsuarioLogado();
       const meuId = userLogado ? userLogado.id : null;
+
       if (isEdicao) {
         // UPDATE
         await executeSql(
@@ -186,9 +191,9 @@ export default function NovaOcorrenciaScreen() {
         Alert.alert("Atualizado", "Dados corrigidos com sucesso!");
         navigation.goBack(); 
 
-} else {
-        // INSERT COM O ID DO DONO
-        const numeroOcorrencia = `B-2025-${Math.floor(Math.random() * 10000)}`;
+      } else {
+        // INSERT NOVO
+        const numeroOcorrencia = `B-${new Date().getFullYear()}-${Math.floor(Math.random() * 100000)}`;
         const uuidLocal = Date.now().toString() + Math.floor(Math.random() * 1000).toString();
 
         const result = await executeSql(
@@ -198,7 +203,7 @@ export default function NovaOcorrenciaScreen() {
             data_acionamento, hora_acionamento, latitude_partida, longitude_partida
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
           [
-            meuId, // <--- ADICIONADO AQUI
+            meuId,
             uuidLocal, numeroOcorrencia, tipoViatura, numeroViatura, grupamento,
             pontoBase, codLocal, formaAcionamento, localAcionamento, 'EM_DESLOCAMENTO',
             dataSaida, horaSaida, gpsSaida.lat, gpsSaida.long
@@ -219,10 +224,19 @@ export default function NovaOcorrenciaScreen() {
       }
     } catch (error) {
       console.error(error);
-      Alert.alert("Erro", "Falha ao salvar dados.");
+      Alert.alert("Erro", "Falha ao salvar dados no banco local.");
     } finally {
       setSalvando(false);
     }
+  };
+
+  // Helper para exibir data bonita na tela (DD/MM/YYYY) mesmo salvando ISO
+  const exibirDataBonita = (isoStr: string) => {
+    if(!isoStr) return '';
+    try {
+      const [ano, mes, dia] = isoStr.split('-');
+      return `${dia}/${mes}/${ano}`;
+    } catch (e) { return isoStr; }
   };
 
   return (
@@ -261,7 +275,7 @@ export default function NovaOcorrenciaScreen() {
           <TextInput style={styles.input} value={codLocal} onChangeText={setCodLocal} placeholder="Ex: 1234" keyboardType="numeric" />
         </View>
 
-        {/* --- CARD DE REGISTRO DE SAÍDA (IGUAL À ETAPA 2) --- */}
+        {/* --- CARD DE REGISTRO DE SAÍDA --- */}
         <Text style={styles.sectionTitle}>Momento do Deslocamento</Text>
         
         <View style={{
@@ -275,7 +289,7 @@ export default function NovaOcorrenciaScreen() {
           {!saidaRegistrada ? (
             <TouchableOpacity 
               style={{
-                backgroundColor: '#B71C1C', // vermelho
+                backgroundColor: '#B71C1C',
                 paddingVertical: 15,
                 borderRadius: 8,
                 flexDirection: 'row',
@@ -299,7 +313,7 @@ export default function NovaOcorrenciaScreen() {
             <View>
               <View style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5}}>
                 <Text style={{fontWeight: 'bold', color: '#555'}}>Data:</Text>
-                <Text style={{color: '#333'}}>{dataSaida}</Text>
+                <Text style={{color: '#333'}}>{exibirDataBonita(dataSaida)}</Text>
               </View>
               <View style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5}}>
                 <Text style={{fontWeight: 'bold', color: '#555'}}>Hora:</Text>

@@ -1,37 +1,43 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from './api';
 
+// A CHAVE MESTRA:
+const TOKEN_KEY = '@Guardiao360:token';
+const USER_KEY = '@Guardiao360:user';
+
 export const AuthService = {
   
-  // 1. FAZER LOGIN E GUARDAR NO COFRE
   login: async (email: string, senha: string) => {
     try {
+      // O backend espera { email, senha }
       const response = await api.post('/login', { email, senha });
+      
+      // O backend retorna { auth: true, token: '...', usuario: {...} }
       const { token, usuario } = response.data;
 
-      // Guarda o Token e os Dados no celular
-      await AsyncStorage.setItem('@Guardiao360:token', token);
-      await AsyncStorage.setItem('@Guardiao360:user', JSON.stringify(usuario));
+      if (!token) throw new Error("Servidor não retornou token.");
 
-      return usuario;
+      // Salva nas chaves corretas
+      await AsyncStorage.setItem(TOKEN_KEY, token);
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(usuario));
+
+      return { user: usuario, token }; 
     } catch (error: any) {
-      throw error.response ? error.response.data : new Error('Erro de Conexão');
+      console.error("Erro Login:", error);
+      throw error.response ? error.response.data : new Error('Falha na conexão com o servidor');
     }
   },
 
-  // 2. FAZER LOGOUT (LIMPAR O COFRE)
   logout: async () => {
-    await AsyncStorage.clear();
+    await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
   },
 
-  // 3. LER O USUÁRIO (PARA EXIBIR NA HOME)
   getUsuarioLogado: async () => {
-    const json = await AsyncStorage.getItem('@Guardiao360:user');
+    const json = await AsyncStorage.getItem(USER_KEY);
     return json ? JSON.parse(json) : null;
   },
 
-  // 4. VERIFICAR SE TEM TOKEN (PARA O APP SABER SE VAI PRA HOME DIRETO)
   getToken: async () => {
-    return await AsyncStorage.getItem('@Guardiao360:token');
+    return await AsyncStorage.getItem(TOKEN_KEY);
   }
 };

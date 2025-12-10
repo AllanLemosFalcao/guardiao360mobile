@@ -12,6 +12,8 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../App'; 
 import { styles } from './DetalhesOcorrenciaScreen.styles';
 import { executeSql } from '../services/db';
+import api from '../services/api';
+import { AuthService } from '../services/auth';
 
 type DetalhesScreenRouteProp = RouteProp<RootStackParamList, 'DetalhesOcorrencia'>;
 
@@ -86,23 +88,61 @@ export default function DetalhesOcorrenciaScreen() {
   const handleBotaoCena = () => navigation.navigate('ChegadaCena', { idOcorrencia, dbId });
   const handleBotaoFinal = () => navigation.navigate('RelatorioFinal', { idOcorrencia, dbId });
 
-  const handleExcluir = () => {
-    if (!dbId) return;
-    Alert.alert("Excluir", "Tem certeza? Isso apagará tudo desta ocorrência.", [
+const handleExcluir = () => {
+  if (!dbId) return;
+
+  Alert.alert(
+    "Excluir Registro",
+    "Tem certeza? Isso apagará do celular E DA NUVEM.",
+    [
       { text: "Cancelar", style: "cancel" },
       { 
-        text: "EXCLUIR", style: "destructive",
+        text: "EXCLUIR TUDO", 
+        style: "destructive",
         onPress: async () => {
           try {
+            const token = await AuthService.getToken();
+            
+            // --- CORREÇÃO CRÍTICA AQUI ---
+            // Priorizamos o 'numero_ocorrencia' porque ele existe igual no MySQL e no SQLite.
+            // O uuid_local pode ser diferente se a ocorrência veio da central.
+            const chaveParaDeletar = dadosCompletos?.numero_ocorrencia || dadosCompletos?.uuid_local;
+
+            if (token && chaveParaDeletar) {
+                try {
+                    console.log(`🗑️ Tentando apagar na nuvem: ${chaveParaDeletar}`);
+                    
+                    // encodeURIComponent é vital caso o número tenha barras (ex: "B/2025/01")
+                    const urlParam = encodeURIComponent(chaveParaDeletar);
+                    
+                    await api.delete(`/ocorrencias/${urlParam}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    console.log("✅ Sucesso: Deletado da nuvem!");
+                } catch (apiError: any) {
+                    console.log("⚠️ Falha ao deletar da nuvem:", apiError?.message);
+                    // Não paramos aqui. Apagamos localmente para garantir.
+                    // Se falhou na nuvem (offline), infelizmente ela voltará no próximo sync.
+                }
+            }
+
+            // 2. APAGA LOCALMENTE (SQLite)
             await executeSql(`DELETE FROM midias WHERE ocorrencia_id = ?`, [dbId]);
             await executeSql(`DELETE FROM vitimas WHERE ocorrencia_id = ?`, [dbId]);
             await executeSql(`DELETE FROM ocorrencias WHERE id = ?`, [dbId]);
+            
+            Alert.alert("Sucesso", "Registro excluído.");
             navigation.goBack();
-          } catch (e) { Alert.alert("Erro", "Falha ao excluir."); }
+
+          } catch (e) {
+            console.error(e);
+            Alert.alert("Erro", "Não foi possível excluir o registro local.");
+          }
         }
       }
-    ]);
-  };
+    ]
+  );
+};
 
   if (!dadosCompletos) return null; // Carregando...
 
@@ -112,11 +152,12 @@ export default function DetalhesOcorrenciaScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Feather name="chevron-left" size={24} color="#333" />
         </TouchableOpacity>
+        
         <Text style={styles.headerTitle}>Detalhes</Text>
         <TouchableOpacity onPress={handleExcluir} style={{ padding: 8 }}>
-          <Feather name="trash-2" size={22} color="#D32F2F" />
-        </TouchableOpacity>
-      </View>
+            <Feather name="trash-2" size={24} color="#D32F2F" />
+         </TouchableOpacity>
+        </View>
 
       {/* BOTÕES DE NAVEGAÇÃO (CORES PRESERVADAS) */}
       <View style={{ flexDirection: 'row', paddingHorizontal: 15, paddingVertical: 10, justifyContent: 'space-between' }}>

@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { 
   View, Text, FlatList, TouchableOpacity, SafeAreaView, Alert,
-  ListRenderItem, Modal, TouchableWithoutFeedback
+  ListRenderItem, Modal, TouchableWithoutFeedback, RefreshControl // <--- 1. Importar RefreshControl
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -9,7 +9,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App'; 
 import { styles } from './OcorrenciasScreen.styles'; 
 import { executeSql } from '../services/db';
-import { AuthService } from '../services/auth'; // <--- Importe do Auth
+import { AuthService } from '../services/auth';
+import { sincronizarDados } from '../services/syncService'; // <--- 2. Importar o Sync
 
 type OcorrenciasScreenProp = NativeStackNavigationProp<RootStackParamList, 'Ocorrencias'>;
 
@@ -29,26 +30,25 @@ export default function OcorrenciasScreen() {
   
   const [listaOcorrencias, setListaOcorrencias] = useState<OcorrenciaBD[]>([]);
   const [carregando, setCarregando] = useState(false);
+  const [refreshing, setRefreshing] = useState(false); // <--- 3. Estado do Refresh
 
-  // --- NOVOS ESTADOS DE FILTRO ---
+  // Filtros
   const [filtroData, setFiltroData] = useState<'HOJE' | '7D' | '30D' | 'TODOS'>('TODOS');
   const [filtroStatus, setFiltroStatus] = useState<'TODOS' | 'EM_ANDAMENTO' | 'FINALIZADO'>('TODOS');
-
-  // Modais
   const [modalDataVisible, setModalDataVisible] = useState(false);
   const [modalStatusVisible, setModalStatusVisible] = useState(false);
 
-  // --- FUNÇÃO DE CARREGAR DADOS (CORRIGIDA) ---
-  const carregarDados = async () => { // <--- AQUI ESTAVA FALTANDO
+  // --- FUNÇÃO DE CARREGAR DADOS DO SQLITE ---
+  const carregarDadosLocais = async () => {
     setCarregando(true);
     try {
-      // 1. Descobre quem sou eu
       const user = await AuthService.getUsuarioLogado();
-      
       if (user && user.id) {
-        // 2. Filtra pelo meu ID no SQLite
+        // Busca apenas as ocorrências deste usuário
         const resultado = await executeSql(
-          `SELECT * FROM ocorrencias WHERE usuario_id = ? ORDER BY id DESC;`, 
+          `SELECT * FROM ocorrencias 
+          WHERE usuario_id = ? 
+          ORDER BY data_acionamento DESC, hora_acionamento DESC, id DESC;`, 
           [user.id]
         );
         setListaOcorrencias(resultado.rows._array);
@@ -60,9 +60,27 @@ export default function OcorrenciasScreen() {
     }
   };
 
+  // --- FUNÇÃO DO PULL-TO-REFRESH ---
+  const onRefresh = async () => {
+    setRefreshing(true);
+    // 1. Vai na nuvem buscar novidades (e enviar pendências)
+    await sincronizarDados(true); 
+    // 2. Recarrega a lista local com o que acabou de baixar
+    await carregarDadosLocais();
+    setRefreshing(false);
+  };
+
+  // --- EFEITO AO FOCAR NA TELA ---
   useFocusEffect(
     useCallback(() => {
-      carregarDados();
+      // Carrega localmente primeiro (rápido)
+      carregarDadosLocais();
+      
+      // Tenta sincronizar em segundo plano (silencioso) para garantir dados frescos
+      sincronizarDados(true).then(() => {
+        // Se baixou algo novo, recarrega a lista
+        carregarDadosLocais();
+      });
     }, [])
   );
 
@@ -70,16 +88,24 @@ export default function OcorrenciasScreen() {
   const parseData = (dataStr: string) => {
     if (!dataStr) return null;
     try {
-      const partes = dataStr.split('/'); // DD/MM/YYYY
-      if (partes.length !== 3) return null;
-      return new Date(parseInt(partes[2]), parseInt(partes[1]) - 1, parseInt(partes[0]));
+      // Tenta formato ISO YYYY-MM-DD
+      if (dataStr.includes('-')) {
+        const [ano, mes, dia] = dataStr.split('-').map(Number);
+        return new Date(ano, mes - 1, dia);
+      }
+      // Tenta formato BR DD/MM/YYYY
+      const partes = dataStr.split('/');
+      if (partes.length === 3) {
+        return new Date(parseInt(partes[2]), parseInt(partes[1]) - 1, parseInt(partes[0]));
+      }
+      return null;
     } catch (e) { return null; }
   };
 
   // --- LÓGICA DE FILTRAGEM ---
   const dadosFiltrados = listaOcorrencias.filter(item => {
     const statusNorm = item.status ? item.status.toUpperCase().trim() : '';
-    const isFinalizado = statusNorm === 'FINALIZADO';
+    const isFinalizado = statusNorm === 'FINALIZADO' || statusNorm === 'ENVIADO'; // Enviado também é finalizado
 
     // 1. Filtro de Status
     if (filtroStatus === 'FINALIZADO' && !isFinalizado) return false;
@@ -105,6 +131,7 @@ export default function OcorrenciasScreen() {
     return true;
   });
 
+  // Labels dos Filtros
   const getLabelData = () => {
     switch(filtroData) {
       case 'HOJE': return 'Hoje';
@@ -122,19 +149,46 @@ export default function OcorrenciasScreen() {
     }
   };
 
-  // --- RENDER ITEM ---
+  // Render Item
   const renderHistoryItem: ListRenderItem<OcorrenciaBD> = ({ item }) => {
-    const statusText = item.status?.replace(/_/g, ' ') || 'PENDENTE';
+    // Normaliza o status para maiúsculo e sem espaços extras
+    const statusRaw = item.status ? item.status.toUpperCase().trim() : 'PENDENTE';
     
-    const getStatusColor = (statusRaw: string) => {
-        const s = statusRaw ? statusRaw.toUpperCase() : '';
-        if (s.includes('CENA')) return '#1565C0';
-        if (s.includes('DESLOCAMENTO')) return '#B71C1C';
-        if (s === 'FINALIZADO') return '#2E7D32';
-        return '#757575';
-    };
+    // Variáveis de Estilo
+    let labelTexto = statusRaw.replace(/_/g, ' '); // Padrão: remove underline
+    let corTexto = '#757575'; // Cinza (Padrão)
+    let corBolinha = null;    // Se não for null, desenha a bolinha
 
-    const statusColor = getStatusColor(item.status);
+    // LÓGICA DE CORES E TEXTOS
+    if (statusRaw === 'ENVIADO') {
+        labelTexto = 'FINALIZADO'; // Usuário vê "Finalizado"
+        corTexto = '#2E7D32';      // Texto Verde
+        corBolinha = '#2E7D32';    // Bolinha Verde (Já subiu pra nuvem)
+    } 
+    else if (statusRaw === 'FINALIZADO') {
+        labelTexto = 'FINALIZADO'; // Usuário vê "Finalizado"
+        corTexto = '#2E7D32';      // Texto Verde
+        corBolinha = '#FF9800';    // Bolinha Laranja (Ainda no celular)
+    }
+    else if (statusRaw.includes('DESLOCAMENTO')) {
+        corTexto = '#B71C1C'; // Vermelho
+    } 
+    else if (statusRaw.includes('CENA')) {
+        corTexto = '#1565C0'; // Azul
+    }
+
+    // Função de Deletar Rápido (Mantida)
+    const confirmarExclusaoRapida = (id: number, numero: string) => {
+       Alert.alert("Excluir", `Apagar ${numero}?`, [
+         { text: "Não", style: "cancel" },
+         { text: "Sim", onPress: async () => {
+             await executeSql(`DELETE FROM midias WHERE ocorrencia_id = ?`, [id]);
+             await executeSql(`DELETE FROM vitimas WHERE ocorrencia_id = ?`, [id]);
+             await executeSql(`DELETE FROM ocorrencias WHERE id = ?`, [id]);
+             carregarDadosLocais();
+         }}
+       ]);
+    };
 
     return (
       <TouchableOpacity 
@@ -149,6 +203,7 @@ export default function OcorrenciasScreen() {
             status: item.status
           }
         })}
+        onLongPress={() => confirmarExclusaoRapida(item.id, item.numero_ocorrencia)}
       >
         <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center'}}>
            <Text style={styles.cardTitle}>{item.numero_ocorrencia || `ID: ${item.id}`}</Text>
@@ -159,14 +214,29 @@ export default function OcorrenciasScreen() {
           <Text style={styles.cardLabel}>Vtr: <Text style={styles.cardValue}>{item.tipo_viatura}-{item.numero_viatura}</Text></Text>
         </View>
 
-        <Text style={[styles.statusText, { color: statusColor }]}>
-          {statusText}
-        </Text>
+        {/* --- ÁREA DO STATUS COM BOLINHA --- */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+            <Text style={[styles.statusText, { color: corTexto, marginTop: 0 }]}>
+              {labelTexto}
+            </Text>
+            
+            {/* Renderiza a bolinha apenas se corBolinha estiver definida */}
+            {corBolinha && (
+                <View style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: corBolinha,
+                    marginLeft: 6, // Espaço entre o texto e a bolinha
+                    elevation: 1   // Sombra leve para destacar
+                }} />
+            )}
+        </View>
+
       </TouchableOpacity>
     );
   };
 
-  // --- HEADER COM DROPDOWNS ---
   const HeaderComponent = () => (
     <View style={styles.filtersContainer}>
       <TouchableOpacity style={styles.dropdownButton} onPress={() => setModalDataVisible(true)}>
@@ -206,65 +276,61 @@ export default function OcorrenciasScreen() {
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={HeaderComponent}
         showsVerticalScrollIndicator={false}
+        // --- 4. CONFIGURAÇÃO DO REFRESH ---
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#B71C1C']} // Cor do loading no Android
+            tintColor="#B71C1C"  // Cor do loading no iOS
+          />
+        }
         ListEmptyComponent={
           <View style={{padding: 20, alignItems: 'center'}}>
             <Text style={{color: '#999', textAlign: 'center'}}>
-              {carregando ? 'Carregando dados...' : 'Nenhuma ocorrência encontrada com esses filtros.'}
+              {carregando ? 'Carregando dados...' : 'Nenhuma ocorrência encontrada.\n(Puxe para atualizar)'}
             </Text>
           </View>
         }
       />
 
-      {/* MODAL DATA */}
+      {/* MODAL DATA (Mantido igual) */}
       <Modal visible={modalDataVisible} transparent animationType="fade" onRequestClose={() => setModalDataVisible(false)}>
         <TouchableWithoutFeedback onPress={() => setModalDataVisible(false)}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Filtrar Data</Text>
-              <TouchableOpacity style={styles.modalItem} onPress={() => { setFiltroData('HOJE'); setModalDataVisible(false); }}>
-                <Text style={[styles.modalItemText, filtroData === 'HOJE' && styles.modalItemTextSelected]}>Hoje</Text>
-                {filtroData === 'HOJE' && <Feather name="check" size={18} color="#1976D2" />}
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalItem} onPress={() => { setFiltroData('7D'); setModalDataVisible(false); }}>
-                <Text style={[styles.modalItemText, filtroData === '7D' && styles.modalItemTextSelected]}>Últimos 7 dias</Text>
-                {filtroData === '7D' && <Feather name="check" size={18} color="#1976D2" />}
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalItem} onPress={() => { setFiltroData('30D'); setModalDataVisible(false); }}>
-                <Text style={[styles.modalItemText, filtroData === '30D' && styles.modalItemTextSelected]}>Último Mês</Text>
-                {filtroData === '30D' && <Feather name="check" size={18} color="#1976D2" />}
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalItem} onPress={() => { setFiltroData('TODOS'); setModalDataVisible(false); }}>
-                <Text style={[styles.modalItemText, filtroData === 'TODOS' && styles.modalItemTextSelected]}>Todas as Datas</Text>
-                {filtroData === 'TODOS' && <Feather name="check" size={18} color="#1976D2" />}
-              </TouchableOpacity>
+              {['HOJE', '7D', '30D', 'TODOS'].map((opt: any) => (
+                  <TouchableOpacity key={opt} style={styles.modalItem} onPress={() => { setFiltroData(opt); setModalDataVisible(false); }}>
+                    <Text style={[styles.modalItemText, filtroData === opt && styles.modalItemTextSelected]}>
+                        {opt === 'TODOS' ? 'Todas as Datas' : opt === 'HOJE' ? 'Hoje' : opt}
+                    </Text>
+                    {filtroData === opt && <Feather name="check" size={18} color="#1976D2" />}
+                  </TouchableOpacity>
+              ))}
             </View>
           </View>
         </TouchableWithoutFeedback>
       </Modal>
 
-      {/* MODAL STATUS */}
+      {/* MODAL STATUS (Mantido igual) */}
       <Modal visible={modalStatusVisible} transparent animationType="fade" onRequestClose={() => setModalStatusVisible(false)}>
         <TouchableWithoutFeedback onPress={() => setModalStatusVisible(false)}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Filtrar Status</Text>
-              <TouchableOpacity style={styles.modalItem} onPress={() => { setFiltroStatus('TODOS'); setModalStatusVisible(false); }}>
-                <Text style={[styles.modalItemText, filtroStatus === 'TODOS' && styles.modalItemTextSelected]}>Todos</Text>
-                {filtroStatus === 'TODOS' && <Feather name="check" size={18} color="#1976D2" />}
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalItem} onPress={() => { setFiltroStatus('EM_ANDAMENTO'); setModalStatusVisible(false); }}>
-                <Text style={[styles.modalItemText, filtroStatus === 'EM_ANDAMENTO' && styles.modalItemTextSelected]}>Em Andamento</Text>
-                {filtroStatus === 'EM_ANDAMENTO' && <Feather name="check" size={18} color="#1976D2" />}
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalItem} onPress={() => { setFiltroStatus('FINALIZADO'); setModalStatusVisible(false); }}>
-                <Text style={[styles.modalItemText, filtroStatus === 'FINALIZADO' && styles.modalItemTextSelected]}>Finalizadas</Text>
-                {filtroStatus === 'FINALIZADO' && <Feather name="check" size={18} color="#1976D2" />}
-              </TouchableOpacity>
+              {['TODOS', 'EM_ANDAMENTO', 'FINALIZADO'].map((opt: any) => (
+                  <TouchableOpacity key={opt} style={styles.modalItem} onPress={() => { setFiltroStatus(opt); setModalStatusVisible(false); }}>
+                    <Text style={[styles.modalItemText, filtroStatus === opt && styles.modalItemTextSelected]}>
+                         {opt === 'TODOS' ? 'Todos' : opt.replace('_', ' ')}
+                    </Text>
+                    {filtroStatus === opt && <Feather name="check" size={18} color="#1976D2" />}
+                  </TouchableOpacity>
+              ))}
             </View>
           </View>
         </TouchableWithoutFeedback>
       </Modal>
-
     </SafeAreaView>
   );
 }

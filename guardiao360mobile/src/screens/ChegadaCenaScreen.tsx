@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  View, Text, TextInput, TouchableOpacity, SafeAreaView, ScrollView, Alert
+  View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator
 } from 'react-native';
+// MUDANÇA 1: SafeAreaView atualizado
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { styles } from './ChegadaCenaScreen.styles';
@@ -24,10 +26,17 @@ const InputComSugestao = ({ label, value, setValue, listaOpcoes, placeholder, zI
   return (
     <View style={[styles.inputGroup, { zIndex: mostrarSugestoes ? 100 : zIndexVal }]}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput style={styles.input} value={value} onChangeText={(t) => {setValue(t); setMostrarSugestoes(true)}} onFocus={() => setMostrarSugestoes(true)} onBlur={() => setTimeout(() => setMostrarSugestoes(false), 200)} placeholder={placeholder} />
+      <TextInput 
+        style={styles.input} 
+        value={value} 
+        onChangeText={(t) => {setValue(t); setMostrarSugestoes(true)}} 
+        onFocus={() => setMostrarSugestoes(true)} 
+        onBlur={() => setTimeout(() => setMostrarSugestoes(false), 200)} 
+        placeholder={placeholder} 
+      />
       {mostrarSugestoes && sugestoesFiltradas.length > 0 && (
         <View style={styles.suggestionsBox}>
-          {sugestoesFiltradas.slice(0, 50).map((item, index) => (
+          {sugestoesFiltradas.slice(0, 50).map((item: string, index: number) => (
             <TouchableOpacity key={index} style={styles.suggestionItem} onPress={() => {setValue(item); setMostrarSugestoes(false)}}>
               <Text style={styles.suggestionText}>{item}</Text>
             </TouchableOpacity>
@@ -45,7 +54,7 @@ export default function ChegadaCenaScreen() {
   
   // ESTADOS
   const [chegadaRegistrada, setChegadaRegistrada] = useState(false);
-  const [horarioChegada, setHorarioChegada] = useState('');
+  const [horarioChegadaVisual, setHorarioChegadaVisual] = useState(''); // Para exibir na tela
   const [coordenadas, setCoordenadas] = useState({ lat: '', long: '' });
   
   const [regiao, setRegiao] = useState('');
@@ -72,7 +81,19 @@ export default function ChegadaCenaScreen() {
           const item = result.rows.item(0);
           
           if (item.data_hora_chegada_local) {
-            setHorarioChegada(item.data_hora_chegada_local);
+            // Tenta converter ISO para Visual se possível, ou usa o que vier
+            try {
+               const dateObj = new Date(item.data_hora_chegada_local);
+               // Se a data for válida
+               if(!isNaN(dateObj.getTime())) {
+                 setHorarioChegadaVisual(dateObj.toLocaleString('pt-BR'));
+               } else {
+                 setHorarioChegadaVisual(item.data_hora_chegada_local);
+               }
+            } catch(e) {
+               setHorarioChegadaVisual(item.data_hora_chegada_local);
+            }
+
             setCoordenadas({ lat: item.latitude_chegada, long: item.longitude_chegada });
             setChegadaRegistrada(true);
           }
@@ -101,36 +122,35 @@ export default function ChegadaCenaScreen() {
     carregarDadosExistentes();
   }, [dbId]);
 
-  // --- FUNÇÃO AJUSTADA: GPS + STATUS 'EM_CENA' ---
+  // --- FUNÇÃO AJUSTADA: GPS + DATA ISO + STATUS 'EM_CENA' ---
   const handleCapturarQTA = async () => {
     if (!dbId) { Alert.alert("Erro", "Ocorrência não identificada."); return; }
     setSalvandoQTA(true);
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') { Alert.alert("Permissão negada", "GPS necessário."); setSalvandoQTA(false); return; }
-      let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       
+      let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const latReal = location.coords.latitude.toString();
       const longReal = location.coords.longitude.toString();
-        //  Data E Hora
+      
       const agora = new Date();
-      // Formato: "07/12/2025 14:30"
-      const dataHoraCompleta = agora.toLocaleString('pt-BR', { 
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit' 
-      });      
+      // MUDANÇA 2: Salvar formato ISO para o Banco (Compatível MySQL)
+      const dataISO = agora.toISOString(); 
+      // Formato Visual para o Usuário
+      const dataVisual = agora.toLocaleString('pt-BR');
 
-await executeSql(
+      await executeSql(
         `UPDATE ocorrencias SET 
           data_hora_chegada_local = ?, 
           latitude_chegada = ?, 
           longitude_chegada = ?,
           status = 'EM_CENA' 
          WHERE id = ?;`, 
-        [dataHoraCompleta, latReal, longReal, dbId]
+        [dataISO, latReal, longReal, dbId]
       );
       
-      setHorarioChegada(dataHoraCompleta); // Atualiza a tela com a data também
+      setHorarioChegadaVisual(dataVisual); 
       setCoordenadas({ lat: latReal, long: longReal });
       setChegadaRegistrada(true);
       
@@ -143,51 +163,39 @@ await executeSql(
     }
   };
   
-  // --- FUNÇÃO ATUALIZADA: FOTO E VÍDEO ---
+  // --- FUNÇÃO ATUALIZADA: FOTO E VÍDEO (CORREÇÃO DEPRECATED) ---
   const handleCamera = async (tipo: 'foto' | 'video') => {
-    if (!dbId) { 
-      Alert.alert("Erro", "ID da ocorrência não encontrado."); 
-      return; 
-    }
+    if (!dbId) { Alert.alert("Erro", "ID da ocorrência não encontrado."); return; }
 
     try {
-      // 1. Solicita APENAS permissão de Câmera (O microfone é automático no sistema)
       const permissionCam = await ImagePicker.requestCameraPermissionsAsync();
-
       if (!permissionCam.granted) { 
-        Alert.alert("Permissão Necessária", "Precisamos de acesso à câmera para registrar a cena."); 
+        Alert.alert("Permissão Necessária", "Precisamos de acesso à câmera."); 
         return; 
       }
 
-      // 2. Configura o tipo de mídia
-      const mediaType = tipo === 'video' 
-        ? ImagePicker.MediaTypeOptions.Videos 
-        : ImagePicker.MediaTypeOptions.Images;
+      // MUDANÇA 3: Uso da nova sintaxe de Array ['images'] ou ['videos']
+      const mediaTypesArray = tipo === 'video' ? ['videos'] : ['images'];
 
-      // 3. Abre a Câmera do Sistema
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: mediaType,
+        mediaTypes: mediaTypesArray as any, // Cast para evitar erro de TS se a lib for antiga
         quality: 0.5,
         videoMaxDuration: 60,
         allowsEditing: false,
       });
 
-      // 4. Salva se deu certo
       if (!result.canceled) {
         const asset = result.assets[0];
         const tipoNoBanco = tipo === 'video' ? 'VIDEO' : 'FOTO';
 
+        // Salva a URI da imagem
         await executeSql(
           `INSERT INTO midias (ocorrencia_id, caminho_arquivo, tipo, data_captura) VALUES (?, ?, ?, ?);`, 
           [dbId, asset.uri, tipoNoBanco, new Date().toISOString()]
         );
 
         setFotosQtd(prev => prev + 1);
-        
-        Alert.alert(
-          tipo === 'video' ? "Vídeo Salvo" : "Foto Salva", 
-          "Mídia anexada com sucesso."
-        );
+        Alert.alert(tipo === 'video' ? "Vídeo Salvo" : "Foto Salva", "Mídia anexada com sucesso.");
       }
 
     } catch (error) { 
@@ -217,24 +225,28 @@ await executeSql(
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}><Feather name="arrow-left" size={24} color="#333" /></TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Feather name="arrow-left" size={24} color="#333" />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>Localização e Cena</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        
+        {/* CARD QTA */}
         <View style={styles.qtaCard}>
           <Text style={styles.qtaTitle}>Registro de Chegada (QTA)</Text>
           {!chegadaRegistrada ? (
             <TouchableOpacity style={[styles.btnCaptura, salvandoQTA && { opacity: 0.7 }]} onPress={handleCapturarQTA} disabled={salvandoQTA}>
-              <MaterialCommunityIcons name="crosshairs-gps" size={24} color="#fff" />
-              <Text style={styles.btnCapturaText}>{salvandoQTA ? 'BUSCANDO...' : 'REGISTRAR HORA E GPS'}</Text>
+              {salvandoQTA ? <ActivityIndicator color="#FFF"/> : <MaterialCommunityIcons name="crosshairs-gps" size={24} color="#fff" />}
+              <Text style={styles.btnCapturaText}>{salvandoQTA ? ' BUSCANDO...' : ' REGISTRAR HORA E GPS'}</Text>
             </TouchableOpacity>
           ) : (
             <View>
               <View style={styles.dataContainer}>
                 <View style={{flexDirection:'row', alignItems:'center', marginBottom:5}}>
                    <Feather name="clock" size={18} color="#1B5E20" style={{marginRight:8}} />
-                   <Text style={styles.dataText}>Horário: {horarioChegada}</Text>
+                   <Text style={styles.dataText}>Horário: {horarioChegadaVisual}</Text>
                 </View>
                 <View style={{flexDirection:'row', alignItems:'center'}}>
                    <Feather name="map-pin" size={18} color="#1B5E20" style={{marginRight:8}} />
@@ -250,8 +262,15 @@ await executeSql(
 
         <Text style={styles.sectionTitle}>Dados da Localização</Text>
         <View style={[styles.row, {zIndex: 20}]}>
-          <View style={styles.halfInput}><InputComSugestao label="Região" value={regiao} setValue={setRegiao} listaOpcoes={LISTA_REGIOES} placeholder="Selecione" zIndexVal={20} /></View>
-          <View style={styles.halfInput}><View style={styles.inputGroup}><Text style={styles.label}>AIS</Text><TextInput style={styles.input} value={ais} onChangeText={setAis} keyboardType="numeric" /></View></View>
+          <View style={styles.halfInput}>
+            <InputComSugestao label="Região" value={regiao} setValue={setRegiao} listaOpcoes={LISTA_REGIOES} placeholder="Selecione" zIndexVal={20} />
+          </View>
+          <View style={styles.halfInput}>
+            <View style={styles.inputGroup}>
+                <Text style={styles.label}>AIS</Text>
+                <TextInput style={styles.input} value={ais} onChangeText={setAis} keyboardType="numeric" />
+            </View>
+          </View>
         </View>
         <InputComSugestao label="Município" value={municipio} setValue={setMunicipio} listaOpcoes={LISTA_MUNICIPIOS} placeholder="Cidade" zIndexVal={15} />
         <View style={styles.inputGroup}><Text style={styles.label}>Bairro</Text><TextInput style={styles.input} value={bairro} onChangeText={setBairro} /></View>
@@ -266,7 +285,7 @@ await executeSql(
         <View style={styles.inputGroup}><Text style={styles.label}>Referência</Text><TextInput style={styles.input} value={referencia} onChangeText={setReferencia} multiline /></View>
 
         <Text style={styles.sectionTitle}>Mídias da Cena</Text>
-        {fotosQtd > 0 && <Text style={{marginBottom:10, color:'#1976D2', fontWeight:'bold'}}>{fotosQtd} foto(s) anexada(s)</Text>}
+        {fotosQtd > 0 && <Text style={{marginBottom:10, color:'#1976D2', fontWeight:'bold'}}>{fotosQtd} arquivo(s) anexado(s)</Text>}
         <View style={styles.mediaContainer}>
           <TouchableOpacity style={styles.mediaButton} onPress={() => handleCamera('foto')}><Feather name="camera" size={32} color="#555" /><Text style={styles.mediaText}>+ Foto</Text></TouchableOpacity>
           <TouchableOpacity style={styles.mediaButton} onPress={() => handleCamera('video')}><Feather name="video" size={32} color="#555" /><Text style={styles.mediaText}>+ Vídeo</Text></TouchableOpacity>

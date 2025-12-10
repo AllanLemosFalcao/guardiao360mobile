@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  View, Text, TextInput, TouchableOpacity, SafeAreaView, ScrollView, Alert, Modal, Image
+  View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Modal, Image
+  // SafeAreaView removido daqui para evitar o warning
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context'; // Importação correta
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import { styles } from './RelatorioFinalScreen.styles';
@@ -30,10 +32,17 @@ const InputComSugestao = ({ label, value, setValue, listaOpcoes, placeholder, zI
   return (
     <View style={[styles.inputGroup, { zIndex: mostrarSugestoes ? 100 : zIndexVal }]}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput style={styles.input} value={value} onChangeText={(t) => {setValue(t); setMostrarSugestoes(true)}} onFocus={() => setMostrarSugestoes(true)} onBlur={() => setTimeout(() => setMostrarSugestoes(false), 200)} placeholder={placeholder} />
+      <TextInput 
+        style={styles.input} 
+        value={value} 
+        onChangeText={(t) => {setValue(t); setMostrarSugestoes(true)}} 
+        onFocus={() => setMostrarSugestoes(true)} 
+        onBlur={() => setTimeout(() => setMostrarSugestoes(false), 200)} 
+        placeholder={placeholder} 
+      />
       {mostrarSugestoes && sugestoesFiltradas.length > 0 && (
         <View style={styles.suggestionsBox}>
-          {sugestoesFiltradas.slice(0, 50).map((item, index) => (
+          {sugestoesFiltradas.slice(0, 50).map((item: string, index: number) => (
             <TouchableOpacity key={index} style={styles.suggestionItem} onPress={() => {setValue(item); setMostrarSugestoes(false)}}>
               <Text style={styles.suggestionText}>{item}</Text>
             </TouchableOpacity>
@@ -70,7 +79,7 @@ export default function RelatorioFinalScreen() {
   const [motivoNaoAtendida, setMotivoNaoAtendida] = useState('');
   const [detalheSemAtuacao, setDetalheSemAtuacao] = useState('');
   const [historico, setHistorico] = useState('');
-  const [horaSaidaLocal, setHoraSaidaLocal] = useState(''); // Começa vazio ou pega do banco
+  const [horaSaidaLocal, setHoraSaidaLocal] = useState('');
   const [chefeGuarnicao, setChefeGuarnicao] = useState('');
 
   // ESTADOS VÍTIMA
@@ -110,7 +119,6 @@ export default function RelatorioFinalScreen() {
           setDetalheSemAtuacao(oco.detalhe_sem_atuacao || '');
           setHistorico(oco.historico_final || '');
           setChefeGuarnicao(oco.chefe_guarnicao || '');
-          // Carrega a hora salva ou a atual se estiver vazio
           setHoraSaidaLocal(oco.hora_saida_local || new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}));
         }
 
@@ -145,7 +153,6 @@ export default function RelatorioFinalScreen() {
     
     if (dbId) {
       try {
-        // Salva imediatamente no banco para segurança
         await executeSql(`UPDATE ocorrencias SET hora_saida_local = ? WHERE id = ?`, [agora, dbId]);
         Alert.alert("Sucesso", `Saída registrada às ${agora}`);
       } catch (error) {
@@ -162,13 +169,14 @@ export default function RelatorioFinalScreen() {
     if (!dbId) { Alert.alert("Erro", "Ocorrência não encontrada."); return; }
     if (!natureza || !grupo || !chefeGuarnicao) { Alert.alert("Campos Obrigatórios", "Preencha Natureza, Grupo e Chefe."); return; }
 
-    Alert.alert("Confirmar", "Deseja salvar/finalizar as alterações?", [
+    Alert.alert("Confirmar Envio", "Deseja finalizar e enviar o relatório?", [
       { text: "Cancelar", style: "cancel" },
       { 
-        text: "SALVAR", 
+        text: "FINALIZAR E ENVIAR", 
         onPress: async () => {
           setSalvando(true);
           try {
+            // 1. PREPARA O TEXTO DO HISTÓRICO
             let historicoFinal = historico;
             if (vitimaEnvolvida === 'Sim' && statusAssinatura !== 'Assinatura Coletada') {
               if(!historicoFinal.includes(`[OBS: ${statusAssinatura.toUpperCase()}]`)) {
@@ -176,6 +184,7 @@ export default function RelatorioFinalScreen() {
               }
             }
 
+            // 2. SALVA NO BANCO LOCAL (SQLITE)
             await executeSql(
               `UPDATE ocorrencias SET 
                 natureza_final = ?, grupo = ?, subgrupo = ?, situacao_ocorrencia = ?,
@@ -185,6 +194,7 @@ export default function RelatorioFinalScreen() {
               [natureza, grupo, subgrupo, situacao, motivoNaoAtendida, detalheSemAtuacao, historicoFinal, chefeGuarnicao, horaSaidaLocal, dbId]
             );
 
+            // 3. SALVA/ATUALIZA VÍTIMA LOCALMENTE
             if (vitimaEnvolvida === 'Sim') {
               const assinaturaParaSalvar = (statusAssinatura === 'Assinatura Coletada') ? assinaturaBase64 : null;
               if (jaExisteVitima) {
@@ -218,10 +228,36 @@ export default function RelatorioFinalScreen() {
               }
             } 
 
-            Alert.alert("Sucesso", "Relatório atualizado/finalizado!");
-            sincronizarDados(true).catch(e => console.log("Erro sync imediato (normal se offline)"));
-            navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
-          } catch (error) { console.error(error); Alert.alert("Erro", "Falha ao salvar."); } finally { setSalvando(false); }
+            // 4. TENTA ENVIAR PARA A NUVEM (MYSQL)
+            // Aqui está a mudança chave: esperamos (await) a resposta.
+            try {
+              Alert.alert("Aguarde", "Enviando dados para o servidor...");
+              await sincronizarDados(true); 
+              
+              // Se passar daqui, deu tudo certo
+              Alert.alert("Concluído", "Relatório finalizado com sucesso!");
+              navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+
+            } catch (syncError: any) {
+              console.log("⚠️ Erro no envio:", syncError);
+              
+              // Se for erro de autenticação (401)
+              if (syncError?.response?.status === 401) {
+                 Alert.alert("Salvo Localmente", "O relatório está salvo no celular, mas sua sessão expirou. Faça LOGIN novamente para enviar.");
+                 navigation.reset({ index: 0, routes: [{ name: 'Login' }] }); // Manda pro Login
+              } else {
+                 // Outro erro (sem internet, servidor fora, etc)
+                 Alert.alert("Salvo Localmente", "Relatório salvo no celular. Não foi possível enviar agora (Sem internet?). Tente sincronizar mais tarde na tela inicial.");
+                 navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+              }
+            }
+            
+          } catch (error) { 
+            console.error(error); 
+            Alert.alert("Erro Crítico", "Falha ao salvar no banco local."); 
+          } finally { 
+            setSalvando(false); 
+          }
         }
       }
     ]);
@@ -253,7 +289,6 @@ export default function RelatorioFinalScreen() {
           {situacao === 'Não Atendida' && <RadioGroup label="Motivo" opcoes={LISTA_NAO_ATENDIDA} selecionado={motivoNaoAtendida} setSelecionado={setMotivoNaoAtendida} />}
           {motivoNaoAtendida === 'Sem atuação/Motivo' && <InputComSugestao label="Detalhe" value={detalheSemAtuacao} setValue={setDetalheSemAtuacao} listaOpcoes={LISTA_SEM_ATUACAO} placeholder="Selecione..." zIndexVal={20} />}
           
-          {/* --- NOVO CAMPO DE SAÍDA COM BOTÃO --- */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Horário de Saída do Local</Text>
             <View style={{flexDirection: 'row', alignItems: 'center'}}>

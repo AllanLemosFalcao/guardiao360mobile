@@ -4,9 +4,11 @@ import {
 } from 'react-native'; 
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
+// REMOVIDO: import AsyncStorage... (O AuthService cuida disso agora)
+
 import { RootStackParamList } from '../../App';
 import { styles } from './LoginScreen.styles'; 
-import { AuthService } from '../services/auth'; // <--- Importamos o serviço
+import { AuthService } from '../services/auth'; 
 
 type LoginScreenProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
@@ -26,17 +28,18 @@ export default function LoginScreen() {
     setCarregando(true);
 
     try {
-      // Tenta logar no servidor
-      const usuario = await AuthService.login(email, senha);
+      // O AuthService já salva o token internamente agora
+      const dadosLogin = await AuthService.login(email, senha);
       
-      // Se der certo, vai pra Home
+      console.log("✅ Login Sucesso:", dadosLogin.user.nome);
+
       navigation.replace('MainTabs', {
         screen: 'HomeTab', 
-        params: { userId: usuario.id, perfil: usuario.perfil }
+        params: { userId: dadosLogin.user.id, perfil: dadosLogin.user.perfil }
       } as any);
 
     } catch (error: any) {
-      const msg = error.error || 'Falha ao conectar.';
+      const msg = error.error || 'Falha ao conectar. Verifique o IP na api.ts';
       Alert.alert('Erro', msg);
     } finally {
       setCarregando(false);
@@ -57,10 +60,23 @@ export default function LoginScreen() {
         <Text style={styles.title}>Entrar na conta</Text>
 
         <Text style={styles.label}>Email</Text>
-        <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address"/>
+        <TextInput 
+            style={styles.input} 
+            placeholder="Email" 
+            value={email} 
+            onChangeText={setEmail} 
+            autoCapitalize="none" 
+            keyboardType="email-address"
+        />
 
         <Text style={styles.label}>Senha</Text>
-        <TextInput style={styles.input} placeholder="Senha" value={senha} onChangeText={setSenha} secureTextEntry/>
+        <TextInput 
+            style={styles.input} 
+            placeholder="Senha" 
+            value={senha} 
+            onChangeText={setSenha} 
+            secureTextEntry
+        />
 
         <TouchableOpacity style={[styles.button, carregando && {opacity:0.7}]} onPress={handleLogin} disabled={carregando}>
           {carregando ? <ActivityIndicator color="#FFF"/> : <Text style={styles.buttonText}>Entrar</Text>}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -6,24 +6,49 @@ import {
   Image, 
   SafeAreaView, 
   Switch, 
-  Alert 
+  ActivityIndicator
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native'; // <--- IMPORTANTE: useFocusEffect
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons'; 
 import { RootStackParamList } from '../../App';
-
-// IMPORTAÇÃO DOS ESTILOS
 import { styles } from './HomeScreen.styles';
 
-// Tipagem da navegação
+// Importa os serviços
+import { AuthService } from '../services/auth';
+import { sincronizarDados } from '../services/syncService'; // <--- Importe a função
+
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'MainTabs'>;
 
 export default function HomeScreen() {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   
-  // Estado do botão "Em Serviço"
   const [emServico, setEmServico] = useState(true);
+  const [usuario, setUsuario] = useState<any>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // EFEITO: Carrega usuário e Sincroniza ao focar na tela
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const carregarTudo = async () => {
+        // 1. Carrega dados do Usuário (Nome, Patente)
+        const user = await AuthService.getUsuarioLogado();
+        if (isActive && user) setUsuario(user);
+
+        // 2. Dispara Sincronização (Download e Upload) em segundo plano
+        // Não bloqueamos a tela, apenas rodamos.
+        setIsSyncing(true);
+        await sincronizarDados(true); // true = modo silencioso (sem muitos alertas)
+        if (isActive) setIsSyncing(false);
+      };
+
+      carregarTudo();
+
+      return () => { isActive = false; };
+    }, [])
+  );
 
   const toggleSwitch = () => setEmServico(previousState => !previousState);
 
@@ -36,7 +61,14 @@ export default function HomeScreen() {
           <MaterialCommunityIcons name="menu" size={30} color="#B71C1C" />
         </TouchableOpacity>
         
-        <Text style={styles.welcomeText}>Bem vindo!, Capitão</Text>
+        <View>
+            <Text style={styles.welcomeText}>
+              Bem vindo!, {usuario ? usuario.patente : 'Bombeiro'}
+            </Text>
+            <Text style={{fontSize: 14, color: '#666'}}>
+              {usuario ? usuario.nome : 'Carregando...'}
+            </Text>
+        </View>
         
         <Image 
           source={{ uri: 'https://github.com/github.png' }} 
@@ -52,7 +84,12 @@ export default function HomeScreen() {
               {emServico ? 'Em Serviço' : 'Indisponível'}
             </Text>
           </Text>
-          <Text style={styles.statusSubTitle}>(CAPT-05)</Text>
+          {isSyncing && (
+             <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 5}}>
+                <ActivityIndicator size="small" color="#B71C1C" />
+                <Text style={{fontSize: 10, color: '#B71C1C', marginLeft: 5}}>Sincronizando...</Text>
+             </View>
+          )}
         </View>
 
         <View style={styles.statusRow}>
@@ -74,7 +111,6 @@ export default function HomeScreen() {
       {/* 3. Menu Principal (Grid) */}
       <View style={styles.gridContainer}>
         
-        {/* Botão 1: Ocorrências (Lista) */}
         <TouchableOpacity 
           style={styles.gridButton} 
           onPress={() => navigation.navigate('Ocorrencias' as any)}
@@ -83,7 +119,6 @@ export default function HomeScreen() {
           <Text style={styles.gridLabel}>Ocorrências</Text>
         </TouchableOpacity>
 
-        {/* Botão 2: Nova Ocorrência */}
         <TouchableOpacity 
           style={styles.gridButton} 
           onPress={() => navigation.navigate('NovaOcorrencia' as any)}
@@ -92,7 +127,6 @@ export default function HomeScreen() {
           <Text style={styles.gridLabel}>Nova Ocorrência</Text>
         </TouchableOpacity>
 
-        {/* Botão 3: Mapa */}
         <TouchableOpacity 
           style={styles.gridButton} 
           onPress={() => navigation.navigate('Mapa' as any)}
@@ -101,7 +135,6 @@ export default function HomeScreen() {
           <Text style={styles.gridLabel}>Mapa de Ocorrências</Text>
         </TouchableOpacity>
 
-        {/* Botão 4: Leitor QR Code */}
         <TouchableOpacity 
           style={styles.gridButton} 
           onPress={() => navigation.navigate('QRCodeScanner' as any)}

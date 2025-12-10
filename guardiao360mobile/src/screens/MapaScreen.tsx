@@ -15,7 +15,6 @@ export default function MapaScreen() {
   const [region, setRegion] = useState<any>(null);
   const [marcadores, setMarcadores] = useState<any[]>([]);
   
-  // MUDANÇA 1: Padrão 'TODOS' para evitar que o filtro de data esconda seus testes antigos
   const [filtroTempo, setFiltroTempo] = useState<'HOJE' | '7D' | '30D' | 'TODOS'>('TODOS');
   const [filtroStatus, setFiltroStatus] = useState<'TODOS' | 'EM ANDAMENTO' | 'FINALIZADOS'>('TODOS');
 
@@ -64,24 +63,32 @@ export default function MapaScreen() {
     }, [])
   );
 
-  // --- HELPER: DATA ---
+  // --- HELPER: DATA (CORRIGIDO PARA ISO + BR) ---
   const parseData = (dataStr: string) => {
     if (!dataStr) return null;
     try {
+      // Formato ISO: YYYY-MM-DD
+      if (dataStr.includes('-')) {
+        const [ano, mes, dia] = dataStr.split('-').map(Number);
+        return new Date(ano, mes - 1, dia);
+      }
+      // Formato BR: DD/MM/YYYY
       const partes = dataStr.split('/'); 
-      if (partes.length !== 3) return null;
-      return new Date(parseInt(partes[2]), parseInt(partes[1]) - 1, parseInt(partes[0]));
+      if (partes.length === 3) {
+        return new Date(parseInt(partes[2]), parseInt(partes[1]) - 1, parseInt(partes[0]));
+      }
+      return null;
     } catch (e) { return null; }
   };
 
   // --- 3. LÓGICA DE FILTRAGEM CORRIGIDA ---
   const getMarcadoresFiltrados = () => {
     return marcadores.filter(item => {
-      // MUDANÇA 2: Normalização do Status (Maiúsculo e sem espaços)
       const statusRaw = item.status || ''; 
       const statusNormalizado = statusRaw.toString().toUpperCase().trim();
       
-      const isFinalizado = statusNormalizado === 'FINALIZADO';
+      // CORREÇÃO AQUI: "Finalizado" inclui quem já foi "Enviado"
+      const isFinalizado = statusNormalizado === 'FINALIZADO' || statusNormalizado === 'ENVIADO';
 
       // Filtro A: Status
       if (filtroStatus === 'EM ANDAMENTO' && isFinalizado) return false;
@@ -91,13 +98,12 @@ export default function MapaScreen() {
       if (filtroTempo === 'TODOS') return true;
 
       const dataItem = parseData(item.data_acionamento);
-      if (!dataItem) return true; // Se não tiver data válida, mostra por segurança
+      if (!dataItem) return true; 
 
       const hoje = new Date();
       hoje.setHours(0,0,0,0);
       dataItem.setHours(0,0,0,0);
 
-      // Diferença em dias
       const diffTime = hoje.getTime() - dataItem.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
@@ -181,9 +187,10 @@ export default function MapaScreen() {
           const lat = parseFloat(item.latitude_chegada);
           const long = parseFloat(item.longitude_chegada);
           
-          // Lógica de Cor (Usando a mesma lógica normalizada)
           const statusRaw = item.status || ''; 
-          const isFinalizado = statusRaw.toString().toUpperCase().trim() === 'FINALIZADO';
+          const s = statusRaw.toString().toUpperCase().trim();
+          // CORREÇÃO DA COR DO PIN TAMBÉM
+          const isFinalizado = s === 'FINALIZADO' || s === 'ENVIADO';
           
           return (
             <Marker
@@ -213,7 +220,7 @@ export default function MapaScreen() {
         })}
       </MapView>
 
-      {/* LEGENDA (COM CONTADOR PARA DEBUG) */}
+      {/* LEGENDA */}
       <View style={styles.legendContainer}>
         <Text style={{fontSize:10, color:'#999', marginBottom:4}}>
           Exibindo {marcadoresVisiveis.length} de {marcadores.length}
