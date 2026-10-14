@@ -54,8 +54,9 @@ export const baixarDadosDoServidor = async () => {
             `INSERT INTO ocorrencias (
               usuario_id, uuid_local, numero_ocorrencia, tipo_viatura, numero_viatura, 
               grupamento, ponto_base, data_acionamento, hora_acionamento,
-              natureza_final, status, situacao_ocorrencia
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`, 
+              natureza_final, status, situacao_ocorrencia,
+              latitude_chegada, longitude_chegada
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`, 
             [
               user.id, 
               oco.uuid_local || `SVR-${Date.now()}-${Math.random()}`, 
@@ -67,8 +68,10 @@ export const baixarDadosDoServidor = async () => {
               oco.data_acionamento, 
               oco.hora_acionamento,
               oco.natureza_final,
-              oco.status || 'FINALIZADO', // <--- AGORA USA O STATUS REAL DO SERVIDOR
-              oco.situacao_ocorrencia || 'Atendida'
+              oco.status || 'FINALIZADO',
+              oco.situacao_ocorrencia || 'Atendida',
+              oco.latitude_chegada,
+              oco.longitude_chegada
             ]
           );
           baixados++;
