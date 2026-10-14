@@ -1,4 +1,6 @@
-# 🚒 Guardião 360 Mobile & Online | Projeto acadêmico (4º período - ADS) focado na aplicação prática de desenvolvimento de sistemas.
+# 🚒 Guardião 360 Mobile & Online 
+
+> **Projeto Acadêmico:** Desenvolvido no 4º período do curso de Análise e Desenvolvimento de Sistemas (ADS).
 
 O **Guardião 360** é um sistema multiplataforma (Aplicativo Mobile + API Backend) focado no registro, gerenciamento e acompanhamento de ocorrências táticas (desenvolvido para as rotinas do Corpo de Bombeiros).
 
